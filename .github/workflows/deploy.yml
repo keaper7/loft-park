@@ -1,0 +1,56 @@
+# Собирает сайт и публикует его на GitHub Pages при каждом пуше в main.
+#
+# GitHub Pages сам ничего не собирает — он умеет только отдавать готовые
+# файлы. Поэтому сборка (npm run build → папка out/, см. output: 'export'
+# в next.config.ts) происходит здесь, в облаке GitHub, а не на компьютере
+# перед пушем: так сайт обновляется от одного `git push`, без ручного
+# шага «собери и закоммить out/» перед каждым изменением.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Разрешает запустить публикацию вручную из вкладки Actions на GitHub —
+  # пригодится, если нужно пересобрать сайт без нового коммита.
+  workflow_dispatch:
+
+# Права по умолчанию у токена — только на чтение; Pages нужно на запись.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Только один деплой одновременно: второй пуш, случившийся во время
+# первой сборки, не должен её оборвать и подменить наполовину.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

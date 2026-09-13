@@ -44,7 +44,9 @@ export function Chapter({
               <motion.span className="inline-block h-px w-12 origin-left bg-amber" style={{ scaleX: line }} />
               {eyebrow}
             </p>
-            <SplitText text={title} className="display text-[clamp(40px,6vw,96px)]" />
+            {/* Нижняя граница 30px: слова не переносятся внутри себя, и
+                «ВСТРЕЧАЮТ» шрифтом Unbounded на 40px не влезал в телефон */}
+            <SplitText text={title} className="display text-[clamp(30px,6vw,96px)]" />
             <Reveal delay={0.25}>
               <p className="mt-7 text-[clamp(16px,1.3vw,20px)] leading-relaxed text-[var(--dim)]">{text}</p>
             </Reveal>

@@ -47,11 +47,11 @@ export function Kitchens() {
             <span className="micro text-[var(--dim-2)]">/ 03</span>
           </div>
 
-          <div className="relative h-[clamp(70px,11vw,190px)] overflow-hidden">
+          <div className="relative h-[clamp(48px,11vw,190px)] overflow-hidden">
             <AnimatePresence mode="popLayout">
               <motion.h3
                 key={k.id}
-                className="display absolute left-0 top-0 text-[clamp(60px,11vw,190px)]"
+                className="display absolute left-0 top-0 text-[clamp(42px,11vw,190px)]"
                 initial={{ y: '100%', opacity: 0, filter: 'blur(12px)' }}
                 animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
                 exit={{ y: '-100%', opacity: 0, filter: 'blur(12px)' }}
@@ -73,7 +73,7 @@ export function Kitchens() {
             >
               <div className="flex items-end justify-between gap-6 border-b border-[var(--hair-strong)] pb-4">
                 <span className="serif text-[clamp(24px,2.4vw,36px)] leading-none">{k.dish}</span>
-                <span className="display text-lg text-ember">{rub(k.price)}</span>
+                <span className="display shrink-0 whitespace-nowrap text-lg text-ember">{rub(k.price)}</span>
               </div>
               <p className="mt-5 leading-relaxed text-[var(--dim)]">{k.text}</p>
             </motion.div>

@@ -28,7 +28,8 @@ export function Footer() {
         </motion.div>
       </div>
 
-      <div className="relative bg-gradient-to-t from-ink via-ink/95 to-transparent px-[var(--pad)] pb-10 pt-[20vh]">
+      {/* pb-28: последняя строка футера должна уезжать выше плавающей плашки «На столе» */}
+      <div className="relative bg-gradient-to-t from-ink via-ink/95 to-transparent px-[var(--pad)] pb-28 pt-[20vh]">
         <Reveal>
           <a href="#top" data-cursor="Наверх" className="display neon flicker block text-center text-[clamp(56px,15vw,260px)] leading-[0.8]">
             {brand.name}

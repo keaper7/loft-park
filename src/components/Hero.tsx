@@ -54,7 +54,8 @@ export function Hero() {
         {eyebrow}
       </motion.p>
 
-      <h1 className="display neon text-[clamp(52px,12.6vw,250px)] leading-[0.82]" style={{ perspective: 800 }} aria-label="Loft Park">
+      {/* нижняя граница 40px: при 52px «LOFT PARK» на 375px вылезал на 2px за край */}
+      <h1 className="display neon text-[clamp(40px,12.6vw,250px)] leading-[0.82]" style={{ perspective: 800 }} aria-label="Loft Park">
         <span aria-hidden="true" className="whitespace-nowrap">
           {letters.map((ch, i) =>
             ch === ' ' ? (

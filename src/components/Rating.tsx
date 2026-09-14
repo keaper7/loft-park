@@ -16,12 +16,12 @@ export function Rating() {
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.5 })
   const [value, setValue] = useState(0)
-  const [reviews, setReviews] = useState(0)
+  const [ratings, setRatings] = useState(0)
 
   useEffect(() => {
     if (!inView) return
     const a = animate(0, rating.value, { duration: 2, ease: EASE, onUpdate: setValue })
-    const b = animate(0, rating.reviews, { duration: 2.4, ease: EASE, onUpdate: (v) => setReviews(Math.round(v)) })
+    const b = animate(0, rating.ratings, { duration: 2.4, ease: EASE, onUpdate: (v) => setRatings(Math.round(v)) })
     return () => {
       a.stop()
       b.stop()
@@ -57,7 +57,9 @@ export function Rating() {
           ))}
         </div>
         <p className="mt-8 text-[clamp(18px,1.6vw,24px)] text-[var(--dim)]">
-          <span className="tabular-nums text-cream">{reviews.toLocaleString('ru-RU')}</span> оценок на {rating.source} · средний чек {rating.averageCheck}
+          {/* ширина числа фиксирована: строка не прыгает, пока бежит счётчик */}
+          <span className="inline-block min-w-[5ch] text-right tabular-nums text-cream">{ratings.toLocaleString('ru-RU')}</span> оценки и {rating.reviews.toLocaleString('ru-RU')} отзывов
+          на Яндекс Картах · средний чек {rating.averageCheck}
         </p>
         <a href={contact.yandexMaps} target="_blank" rel="noreferrer" data-cursor="Открыть" className="micro mt-6 border-b border-amber/50 pb-1 text-amber">
           Проверить на Яндекс Картах ↗

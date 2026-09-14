@@ -5,8 +5,12 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { fx } from './fx'
 import { GAZEBO } from './layout'
+import { Instances, mat, seeded } from './instancing'
 
+// Туман подключён штатными чанками three.js: без него шторы с аллеи
+// горели белой стеной сквозь ночную дымку
 const curtainVertex = /* glsl */ `
+  #include <fog_pars_vertex>
   uniform float uTime;
   uniform float uPhase;
   varying vec2 vUv;
@@ -20,22 +24,28 @@ const curtainVertex = /* glsl */ `
     float wind = sin(uv.x * 5.0 + uTime * 1.6 + uPhase) * 0.18 + sin(uv.x * 11.0 - uTime * 2.3 + uPhase) * 0.06;
     p.z += folds + wind * hang;
     vFold = sin(uv.x * 38.0);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
   }
 `
 const curtainFragment = /* glsl */ `
+  #include <fog_pars_fragment>
   varying vec2 vUv;
   varying float vFold;
   void main() {
-    float shade = 0.82 + 0.18 * vFold;
-    gl_FragColor = vec4(vec3(1.0, 0.97, 0.92) * shade, 0.42 + 0.12 * vFold);
+    float shade = 0.8 + 0.2 * vFold;
+    // ночью тюль подсвечен тёплыми лампами изнутри, а не белый
+    gl_FragColor = vec4(vec3(0.82, 0.72, 0.58) * shade, 0.32 + 0.1 * vFold);
+    #include <fog_fragment>
   }
 `
 
 /**
- * Белый шатёр рядом с террасой: чёрный стальной каркас, тюлевые шторы,
- * которые колышутся на ветру (вершинный шейдер), красные бархатные
- * диваны и «люстра» из зелени с лампочками под крышей.
+ * Белый шатёр рядом с террасой (по фото гостей): чёрный стальной каркас,
+ * тюлевые шторы, которые колышутся на ветру (вершинный шейдер), серые
+ * диваны на деревянной раме с оранжевыми подушками, красные кресла на
+ * гнутых полозьях и «облако» искусственных цветов под крышей.
  */
 export function Gazebo() {
   const G = GAZEBO
@@ -55,6 +65,27 @@ export function Gazebo() {
       { pos: [G.x0, G.h / 2, G.zFar + 1.2], rotY: Math.PI / 2, width: 2.2 },
     ],
     [G, cx, cz, d, w],
+  )
+
+  const bloomGeo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
+  const bloomMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }), [])
+  const blooms = useMemo(() => {
+    const r = seeded(57)
+    const palette = ['#e9a3b8', '#f3eee6', '#c7849a', '#9fb3ad', '#5f7f47', '#7d9a5c'].map((c) => new THREE.Color(c))
+    const items: THREE.Matrix4[] = []
+    const colors: THREE.Color[] = []
+    for (let i = 0; i < 520; i++) {
+      const s = 0.03 + r() * 0.055
+      // гуще у крыши, редкие «плети» свисают ниже
+      items.push(mat([G.x0 + 0.6 + r() * (w - 1.2), G.h - 0.1 - Math.pow(r(), 2.2) * 0.9, G.zFar + 0.6 + r() * (d - 1.2)], [s, s, s], r() * 3, r() * 3))
+      colors.push(palette[Math.floor(r() * palette.length)])
+    }
+    return { items, colors }
+  }, [G, w, d])
+
+  const curtainUniforms = useMemo(
+    () => curtains.map((_, i) => ({ ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: { value: 0 }, uPhase: { value: i * 1.7 } })),
+    [curtains],
   )
 
   useFrame((_, dt) => {
@@ -109,7 +140,8 @@ export function Gazebo() {
             }}
             vertexShader={curtainVertex}
             fragmentShader={curtainFragment}
-            uniforms={{ uTime: { value: 0 }, uPhase: { value: i * 1.7 } }}
+            uniforms={curtainUniforms[i]}
+            fog
             transparent
             depthWrite={false}
             side={THREE.DoubleSide}
@@ -117,49 +149,68 @@ export function Gazebo() {
         </mesh>
       ))}
 
-      {/* красные диваны буквой П и столик */}
+      {/* серые диваны на деревянной раме; спинка у локального −z */}
       {[
-        [cx + 2.6, cz, Math.PI / 2, 3.2],
-        [cx, cz - 2.2, 0, 2.4],
-        [cx, cz + 2.2, Math.PI, 2.4],
+        [G.x1 - 0.7, cz - 1.6, -Math.PI / 2, 3],
+        [cx - 0.4, G.zFar + 0.8, 0, 3.2],
       ].map(([x, z, ry, len]) => (
         <group key={`${x}${z}`} position={[x, 0.16, z]} rotation-y={ry}>
-          <mesh position={[0, 0.26, 0]}>
-            <boxGeometry args={[len, 0.42, 0.8]} />
-            <meshStandardMaterial color="#8c1d24" roughness={0.85} />
+          <mesh position={[0, 0.22, 0]}>
+            <boxGeometry args={[len + 0.2, 0.12, 0.85]} />
+            <meshStandardMaterial color="#9a6436" roughness={0.6} />
           </mesh>
-          <mesh position={[0, 0.66, -0.32]}>
-            <boxGeometry args={[len, 0.55, 0.18]} />
-            <meshStandardMaterial color="#7a171e" roughness={0.85} />
+          <mesh position={[0, 0.36, 0.04]}>
+            <boxGeometry args={[len, 0.16, 0.72]} />
+            <meshStandardMaterial color="#8d8b86" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.66, -0.34]} rotation-x={-0.12}>
+            <boxGeometry args={[len, 0.5, 0.16]} />
+            <meshStandardMaterial color="#8d8b86" roughness={0.95} />
+          </mesh>
+          {[-len / 3, len / 4].map((dx) => (
+            <mesh key={dx} position={[dx, 0.6, -0.22]} rotation={[-0.3, 0, 0.1]}>
+              <boxGeometry args={[0.42, 0.36, 0.12]} />
+              <meshStandardMaterial color="#e0803f" roughness={0.9} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {/* красные кресла на гнутых полозьях */}
+      {[
+        [G.x1 - 3, cz - 2.5, Math.PI / 2 + 0.3],
+        [G.x1 - 3, cz - 0.7, Math.PI / 2 - 0.3],
+        [cx - 1.6, G.zFar + 2.7, Math.PI - 0.2],
+      ].map(([x, z, ry]) => (
+        <group key={`${x}${z}`} position={[x, 0.16, z]} rotation-y={ry}>
+          {[-0.3, 0.3].map((dx) => (
+            <mesh key={dx} position={[dx, 0.38, 0]} rotation-y={Math.PI / 2}>
+              <torusGeometry args={[0.36, 0.03, 6, 14, Math.PI]} />
+              <meshStandardMaterial color="#9a6436" roughness={0.6} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.46, 0.05]} rotation-x={0.12}>
+            <boxGeometry args={[0.6, 0.14, 0.6]} />
+            <meshStandardMaterial color="#b5202a" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.78, -0.26]} rotation-x={-0.4}>
+            <boxGeometry args={[0.6, 0.55, 0.14]} />
+            <meshStandardMaterial color="#b5202a" roughness={0.7} />
           </mesh>
         </group>
       ))}
-      <mesh position={[cx, 0.6, cz]}>
-        <boxGeometry args={[1.8, 0.06, 1.1]} />
+      <mesh position={[G.x1 - 2, 0.6, cz - 1.6]}>
+        <boxGeometry args={[0.9, 0.06, 1.6]} />
         <meshStandardMaterial color="#6b442a" roughness={0.6} />
       </mesh>
 
-      {/* люстра из зелени */}
-      <group position={[cx, G.h - 0.6, cz]}>
-        {Array.from({ length: 9 }, (_, i) => {
-          const a = (i / 9) * Math.PI * 2
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.55, Math.sin(i * 1.3) * 0.12, Math.sin(a) * 0.55]} scale={0.32}>
-              <icosahedronGeometry args={[1, 1]} />
-              <meshStandardMaterial color={i % 3 ? '#4d7a45' : '#8aa7a0'} roughness={1} />
-            </mesh>
-          )
-        })}
-        {Array.from({ length: 6 }, (_, i) => {
-          const a = (i / 6) * Math.PI * 2 + 0.3
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.4, -0.25, Math.sin(a) * 0.4]}>
-              <sphereGeometry args={[0.05, 8, 6]} />
-              <meshBasicMaterial color={[6, 3.6, 1.4]} toneMapped={false} />
-            </mesh>
-          )
-        })}
-      </group>
+      {/* «облако» цветов и зелени под крышей и лампочки в нём */}
+      <Instances items={blooms.items} geometry={bloomGeo} material={bloomMat} colors={blooms.colors} />
+      {Array.from({ length: 8 }, (_, i) => (
+        <mesh key={i} position={[G.x0 + 1 + ((i * 2.9) % (w - 2)), G.h - 0.55 - (i % 3) * 0.12, G.zFar + 1 + ((i * 4.3) % (d - 2))]}>
+          <sphereGeometry args={[0.05, 8, 6]} />
+          <meshBasicMaterial color={[6, 3.6, 1.4]} toneMapped={false} />
+        </mesh>
+      ))}
       <pointLight position={[cx, G.h - 0.8, cz]} color="#ffb46a" intensity={10} distance={10} decay={1.5} />
     </group>
   )

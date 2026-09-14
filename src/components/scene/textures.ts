@@ -60,29 +60,29 @@ export function brickTexture(repeat: [number, number] = [4, 2]) {
   return toTexture(c, repeat)
 }
 
-/** Тёмные дубовые доски пола */
-export function woodTexture(repeat: [number, number] = [6, 6]) {
+/**
+ * Ротанг: диагональная плетёнка с просветами. С alphaTest кресла террасы
+ * становятся «корзинками», через которые видно подушку и настил, —
+ * как настоящие плетёные кресла на фото.
+ */
+export function weaveTexture(repeat: [number, number] = [6, 2]) {
   const c = document.createElement('canvas')
-  c.width = c.height = 512
+  c.width = c.height = 64
   const g = c.getContext('2d')!
-  const r = rand(3)
-  const pw = 64
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = `hsl(${24 + r() * 8} ${30 + r() * 10}% ${11 + r() * 6}%)`
-    g.fillRect(i * pw, 0, pw, 512)
-    for (let k = 0; k < 40; k++) {
-      g.strokeStyle = `rgba(0,0,0,${0.08 + r() * 0.12})`
-      g.lineWidth = 1
+  g.clearRect(0, 0, 64, 64)
+  const strands = (color: string, width: number, dir: 1 | -1) => {
+    g.strokeStyle = color
+    g.lineWidth = width
+    // шаг 16 px укладывается в тайл 64 px четыре раза — шов не виден
+    for (let k = -64; k <= 128; k += 16) {
       g.beginPath()
-      const x = i * pw + r() * pw
-      g.moveTo(x, 0)
-      g.bezierCurveTo(x + r() * 6 - 3, 170, x + r() * 6 - 3, 340, x + r() * 4 - 2, 512)
+      g.moveTo(k, 0)
+      g.lineTo(k + 64 * dir, 64)
       g.stroke()
     }
-    g.fillStyle = 'rgba(0,0,0,0.6)'
-    g.fillRect(i * pw, 0, 2, 512)
-    g.fillRect(i * pw, r() * 512, pw, 2)
   }
+  strands('#7d5f3a', 6, 1)
+  strands('#c4a274', 5, -1)
   return toTexture(c, repeat)
 }
 
@@ -129,21 +129,32 @@ export function vinylTexture() {
   return toTexture(c)
 }
 
-/** Площадь перед лофтом: бетонная плитка «кирпичиком», серо-розовая */
-export function paversTexture(repeat: [number, number] = [8, 8]) {
+/**
+ * Плитка парка «кирпичиком» — как на фото площади: вперемешку
+ * красно-коричневые, серые и бежевые брусочки. seed разный у аллеи и
+ * площади, чтобы рисунок не повторялся один в один.
+ */
+export function paversTexture(repeat: [number, number] = [8, 8], seed = 17) {
   const c = document.createElement('canvas')
   c.width = c.height = 512
   const g = c.getContext('2d')!
-  const r = rand(17)
-  g.fillStyle = '#2b2624'
+  const r = rand(seed)
+  g.fillStyle = '#35302c'
   g.fillRect(0, 0, 512, 512)
   const w = 64
   const h = 32
+  const palette = [
+    [8, 34, 34], // красно-коричневый
+    [12, 30, 40],
+    [20, 8, 44], // серый
+    [30, 14, 52], // бежевый
+    [4, 38, 28], // тёмный кирпич
+  ]
   for (let row = 0; row * h < 512; row++) {
     const off = row % 2 ? w / 2 : 0
     for (let col = -1; col * w < 512 + w; col++) {
-      const l = 30 + r() * 12
-      g.fillStyle = `hsl(${8 + r() * 14} ${10 + r() * 12}% ${l}%)`
+      const [hue, sat, light] = palette[Math.floor(r() * palette.length)]
+      g.fillStyle = `hsl(${hue + r() * 6} ${sat + r() * 6}% ${light + r() * 7}%)`
       g.fillRect(col * w + off + 2, row * h + 2, w - 4, h - 4)
     }
   }
@@ -152,6 +163,87 @@ export function paversTexture(repeat: [number, number] = [8, 8]) {
     g.fillRect(r() * 512, r() * 512, 1 + r() * 2, 1 + r() * 2)
   }
   return toTexture(c, repeat)
+}
+
+/**
+ * Горизонтальные рейки: перегородки террасы и ящики-кашпо. Тёплое
+ * коричневое дерево с тёмными щелями между рейками; щели прозрачны,
+ * если alpha = true, — сквозь перегородку просвечивает свет.
+ */
+export function slatsTexture(repeat: [number, number] = [1, 1], alpha = false) {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const r = rand(alpha ? 61 : 67)
+  g.clearRect(0, 0, 256, 256)
+  if (!alpha) {
+    g.fillStyle = '#140c07'
+    g.fillRect(0, 0, 256, 256)
+  }
+  const n = 8
+  const step = 256 / n
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = `hsl(${22 + r() * 6} ${38 + r() * 10}% ${26 + r() * 8}%)`
+    g.fillRect(0, i * step, 256, step * 0.72)
+    for (let k = 0; k < 8; k++) {
+      g.strokeStyle = `rgba(30,15,5,${0.1 + r() * 0.15})`
+      g.beginPath()
+      const y = i * step + r() * step * 0.7
+      g.moveTo(0, y)
+      g.lineTo(256, y + r() * 2 - 1)
+      g.stroke()
+    }
+  }
+  return toTexture(c, repeat)
+}
+
+/** Бетон кашпо: светло-серый, в пятнах и порах */
+export function concreteTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const r = rand(71)
+  g.fillStyle = '#a7a39b'
+  g.fillRect(0, 0, 256, 256)
+  for (let i = 0; i < 90; i++) {
+    const x = r() * 256
+    const y = r() * 256
+    const rad = 10 + r() * 40
+    const grd = g.createRadialGradient(x, y, 0, x, y, rad)
+    const d = r() > 0.5
+    grd.addColorStop(0, d ? 'rgba(60,55,50,0.12)' : 'rgba(255,255,250,0.1)')
+    grd.addColorStop(1, 'rgba(0,0,0,0)')
+    g.fillStyle = grd
+    g.fillRect(x - rad, y - rad, rad * 2, rad * 2)
+  }
+  for (let i = 0; i < 2500; i++) {
+    g.fillStyle = 'rgba(40,36,32,0.25)'
+    g.fillRect(r() * 256, r() * 256, 1, 1)
+  }
+  return toTexture(c)
+}
+
+/** Столешницы зала «ёлочкой»: светлый дуб, как на фото у стены из мха */
+export function herringboneTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const r = rand(83)
+  g.fillStyle = '#6b4526'
+  g.fillRect(0, 0, 256, 256)
+  const s = 32
+  for (let y = -s; y < 256 + s; y += s / 2) {
+    for (let x = 0; x < 256; x += s) {
+      const left = (x / s) % 2 === 0
+      g.save()
+      g.translate(x + s / 2, y)
+      g.rotate(left ? Math.PI / 4 : -Math.PI / 4)
+      g.fillStyle = `hsl(${30 + r() * 6} ${45 + r() * 10}% ${48 + r() * 10}%)`
+      g.fillRect(-s * 0.7, -s * 0.16, s * 1.4, s * 0.3)
+      g.restore()
+    }
+  }
+  return toTexture(c)
 }
 
 /** Светлые доски: потолок зала и настил террасы */
@@ -203,37 +295,3 @@ export function mossTexture(repeat: [number, number] = [3, 1.5]) {
   return toTexture(c, repeat)
 }
 
-/** Мелкая подпись на постаменте букв: «BAR & KITCHEN», «TERRACE» */
-export function labelTexture(text: string, w = 512, h = 96) {
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  const g = c.getContext('2d')!
-  g.fillStyle = '#0b0b0c'
-  g.fillRect(0, 0, w, h)
-  g.fillStyle = '#f4f1ea'
-  g.font = `600 ${Math.round(h * 0.42)}px Unbounded, sans-serif`
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.fillText(text, w / 2, h / 2)
-  return toTexture(c)
-}
-
-/** Неоновая вывеска над входом. Шрифт — тот же, что на сайте */
-export function signTexture(text: string) {
-  const c = document.createElement('canvas')
-  c.width = 1024
-  c.height = 256
-  const g = c.getContext('2d')!
-  g.clearRect(0, 0, 1024, 256)
-  g.font = '800 150px Unbounded, sans-serif'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.shadowColor = '#ff9a3d'
-  g.shadowBlur = 40
-  g.fillStyle = '#ffe2b8'
-  g.fillText(text, 512, 132)
-  g.shadowBlur = 12
-  g.fillText(text, 512, 132)
-  return toTexture(c)
-}

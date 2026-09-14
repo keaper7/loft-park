@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { brand, contact, nav } from '@/content'
 import { useStore } from '@/lib/store'
 import { getLenis } from '@/lib/scroll'
@@ -26,10 +26,18 @@ export function Nav() {
     setHidden(v > prev && v > 200)
   })
 
+  // Запускаем скролл обратно, только если его остановило меню. Иначе при
+  // монтировании start() снимал блокировку прелоадера (SmoothScroll)
+  const stoppedByMenu = useRef(false)
   useEffect(() => {
     const l = getLenis()
-    if (open) l?.stop()
-    else l?.start()
+    if (open) {
+      l?.stop()
+      stoppedByMenu.current = true
+    } else if (stoppedByMenu.current) {
+      l?.start()
+      stoppedByMenu.current = false
+    }
   }, [open])
 
   return (

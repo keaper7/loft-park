@@ -125,15 +125,25 @@ function Dish({ parts, index, x }: { parts: Part[]; index: number; x: number }) 
   const dirs = useMemo(() => {
     const r = seeded(100 + index)
     return parts.map(() => {
-      const v = new THREE.Vector3(r() - 0.5, 0.6 + r() * 0.9, r() - 0.5).normalize()
-      return { v, dist: 0.5 + r() * 1.1, spin: new THREE.Vector3(r() * 6 - 3, r() * 6 - 3, r() * 6 - 3) }
+      // Разлёт вверх и от камеры (она стоит со стороны +z): детали летели
+      // прямо в объектив и на пол-пути между блюдами закрывали полкадра
+      const v = new THREE.Vector3(r() - 0.5, 0.5 + r() * 0.7, -(0.2 + r() * 0.6)).normalize()
+      return { v, dist: 0.35 + r() * 0.8, spin: new THREE.Vector3(r() * 6 - 3, r() * 6 - 3, r() * 6 - 3) }
     })
   }, [parts, index])
 
   useFrame(({ clock }, dt) => {
     const e = smoothstep(0.1, 0.85, Math.abs(fx.cam - index))
+    // Дальше кадра блюдо сворачивается и прячется: иначе в пролёте камеры
+    // через зал (меню, DJ) над столом висели рассыпанные детали. Между
+    // соседними блюдами (cam = 4.5) видны оба
+    const far = smoothstep(0.75, 1.25, Math.abs(fx.cam - index))
     const t = clock.elapsedTime
-    if (group.current && !fx.reduced) group.current.rotation.y += dt * (0.18 + e * 0.4)
+    if (group.current) {
+      group.current.visible = far < 0.999
+      group.current.scale.setScalar(Math.max(0.001, 1 - far))
+      if (!fx.reduced) group.current.rotation.y += dt * (0.18 + e * 0.4)
+    }
     parts.forEach((p, i) => {
       const m = refs.current[i]
       if (!m || p.fixed) return

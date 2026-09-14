@@ -54,14 +54,22 @@ export function Booking() {
 
   const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
   const timeDisabled = (t: string) => day === 0 && toMin(t) < nowMin + 30
+  // Поздно вечером на сегодня не остаётся ни одного слота: «сегодня»
+  // выключаем и сразу переносим выбор на завтра
+  const noneToday = booking.times.every((t) => toMin(t) < nowMin + 30)
 
   useEffect(() => {
+    if (!days.length) return
+    if (day === 0 && noneToday) {
+      setDay(1)
+      return
+    }
     if (timeDisabled(time)) {
       const free = booking.times.find((t) => !timeDisabled(t))
       if (free) setTime(free)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day, nowMin])
+  }, [day, nowMin, days.length])
 
   const message = useMemo(
     () =>
@@ -113,11 +121,14 @@ export function Booking() {
               inert={done}
             >
               <LayoutGroup id="booking">
-                <fieldset>
+                {/* min-w-0: у fieldset по умолчанию min-width = ширине содержимого,
+                    и лента из 14 дат растягивала его на 700 px за край вместо
+                    собственной прокрутки — дальние даты были недоступны */}
+                <fieldset className="min-w-0">
                   <legend className="micro mb-3 text-[10px] text-[var(--dim-2)]">Дата</legend>
                   <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" data-lenis-prevent>
                     {days.map((d, i) => (
-                      <Chip key={i} group="day" on={i === day} onClick={() => setDay(i)}>
+                      <Chip key={i} group="day" on={i === day} disabled={i === 0 && noneToday} onClick={() => setDay(i)}>
                         <span className="flex w-10 flex-col items-center leading-tight">
                           <span className="micro text-[9px] opacity-80">{i === 0 ? 'сег' : i === 1 ? 'зав' : wd.format(d)}</span>
                           <span className="display text-lg">{d.getDate()}</span>

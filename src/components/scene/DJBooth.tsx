@@ -83,7 +83,8 @@ export function DJBooth() {
         b.rotation.x = 0.35 + Math.cos(t * 0.6 + i) * 0.2
       }
       const m = beamMats.current[i]
-      if (m) m.uniforms.uOpacity.value = 0.05 + near * 0.3
+      // лучи не должны заливать буквы на стене из мха
+      if (m) m.uniforms.uOpacity.value = 0.02 + near * 0.12
     })
     if (neon.current) {
       const hue = fx.reduced ? 0.06 : 0.92 + Math.sin(t * 0.4) * 0.08
@@ -140,7 +141,7 @@ export function DJBooth() {
           }}
         >
           <mesh position={[0, -1.6, 0]}>
-            <coneGeometry args={[0.6, 3.2, 24, 1, true]} />
+            <coneGeometry args={[0.42, 3.2, 24, 1, true]} />
             <shaderMaterial
               ref={(el) => {
                 beamMats.current[i] = el

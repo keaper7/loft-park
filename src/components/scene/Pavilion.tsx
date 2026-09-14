@@ -2,33 +2,38 @@
 
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { SQUARE, TERRACE, TREES } from './layout'
-import { paversTexture, planksTexture } from './textures'
+import { POLES, SQUARE, TERRACE, TREES } from './layout'
+import { concreteTexture, paversTexture, planksTexture, slatsTexture, weaveTexture } from './textures'
+import { Instances, mat, seeded } from './instancing'
 
 /**
- * Площадь и терраса Loft Park: плитка, настил, маркизы на стальном
- * каркасе (с проёмами там, где сквозь крышу растут деревья), кашпо и
- * чёрный заборчик по фасаду, зелёный коврик у входа, плетёные кресла
- * с розовыми подушками, обогреватели-пирамиды, белые фонари-домики
- * и гирлянды-фестоны над площадью.
+ * Площадь и терраса Loft Park — по фотографиям гостей:
+ * - площадь из разноцветной плитки, лавочки у заборчика, столбы, от которых
+ *   к террасе натянуты параллельные нити гирлянд;
+ * - фасад: чёрная стальная рама, в ней деревянные ящики со стриженым
+ *   кустарником; вход — ступень настила, зелёный коврик и два бетонных куба
+ *   с деревцами;
+ * - над настилом бежевые маркизы складками на чёрном каркасе, в них проёмы
+ *   под стволы деревьев;
+ * - плетёные кресла-«бочонки» с цветными подушками у деревянных столов,
+ *   пирамиды-обогреватели, белые фонари-домики, плетёные подвесные лампы;
+ * - лаунж справа: диваны на деревянном каркасе, красные кресла, красные
+ *   шторы, реечная перегородка и «облако» из искусственных цветов под крышей.
  */
 
-const steel = new THREE.MeshStandardMaterial({ color: '#17171a', metalness: 0.7, roughness: 0.45 })
+const steel = new THREE.MeshStandardMaterial({ color: '#141416', metalness: 0.5, roughness: 0.55 })
 
-function seeded(seed: number) {
-  let s = seed
-  return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646
-}
+type Span = [number, number, number, number, number, number]
 
 /** Провисающие гирлянды: пары точек → кривые → лампы одним инстансом */
-function Festoons({ spans, per }: { spans: [number, number, number, number, number, number][]; per: number }) {
+function Festoons({ spans, density }: { spans: Span[]; density: number }) {
   const bulbs = useRef<THREE.InstancedMesh>(null)
   const curves = useMemo(
     () =>
       spans.map(([ax, ay, az, bx, by, bz]) => {
         const A = new THREE.Vector3(ax, ay, az)
         const B = new THREE.Vector3(bx, by, bz)
-        const sag = A.distanceTo(B) * 0.06
+        const sag = A.distanceTo(B) * 0.055
         const pts = Array.from({ length: 17 }, (_, i) => {
           const t = i / 16
           const p = A.clone().lerp(B, t)
@@ -39,143 +44,281 @@ function Festoons({ spans, per }: { spans: [number, number, number, number, numb
       }),
     [spans],
   )
-  const points = useMemo(() => curves.flatMap((c) => Array.from({ length: per }, (_, i) => c.getPoint((i + 0.5) / per))), [curves, per])
+  const points = useMemo(
+    () =>
+      curves.flatMap((c) => {
+        const n = Math.max(4, Math.round(c.getLength() * density))
+        return Array.from({ length: n }, (_, i) => c.getPoint((i + 0.5) / n))
+      }),
+    [curves, density],
+  )
   useLayoutEffect(() => {
     const m = new THREE.Matrix4()
-    points.forEach((p, i) => bulbs.current?.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.07, p.z)))
+    points.forEach((p, i) => bulbs.current?.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.08, p.z)))
     if (bulbs.current) bulbs.current.instanceMatrix.needsUpdate = true
   }, [points])
   return (
     <group>
       {curves.map((c, i) => (
         <mesh key={i}>
-          <tubeGeometry args={[c, 32, 0.01, 3, false]} />
-          <meshBasicMaterial color="#111" />
+          <tubeGeometry args={[c, 32, 0.012, 3, false]} />
+          <meshBasicMaterial color="#0d0d0d" />
         </mesh>
       ))}
       <instancedMesh ref={bulbs} args={[undefined, undefined, points.length]}>
-        <sphereGeometry args={[0.055, 8, 6]} />
-        <meshBasicMaterial color={[5.5, 3.4, 1.4]} toneMapped={false} />
+        <sphereGeometry args={[0.06, 8, 6]} />
+        <meshBasicMaterial color={[5.5, 3.6, 1.6]} toneMapped={false} />
       </instancedMesh>
     </group>
   )
 }
 
-/** Однотипная мебель — инстансами: одна геометрия, много матриц */
-function Instances({ items, geometry, material }: { items: THREE.Matrix4[]; geometry: THREE.BufferGeometry; material: THREE.Material }) {
-  const ref = useRef<THREE.InstancedMesh>(null)
-  useLayoutEffect(() => {
-    items.forEach((m, i) => ref.current?.setMatrixAt(i, m))
-    if (ref.current) ref.current.instanceMatrix.needsUpdate = true
-  }, [items])
-  return <instancedMesh ref={ref} args={[geometry, material, items.length]} />
+/** Маркиза складками: зигзаг поперёк, как у выдвижных тентов на фото */
+function pleatGeometry(w: number, d: number, pleat = 0.3, amp = 0.07) {
+  const seg = Math.max(8, Math.round(w / pleat) * 2)
+  const g = new THREE.PlaneGeometry(w, d, seg, 1)
+  g.rotateX(-Math.PI / 2)
+  const p = g.attributes.position
+  const step = w / seg
+  for (let i = 0; i < p.count; i++) {
+    const j = Math.round((p.getX(i) + w / 2) / step)
+    p.setY(i, j % 2 ? amp : 0)
+  }
+  g.computeVertexNormals()
+  return g
 }
 
-const mat = (p: [number, number, number], s: [number, number, number] = [1, 1, 1], ry = 0) =>
-  new THREE.Matrix4().compose(new THREE.Vector3(...p), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(...s))
+/** Стриженый кустарник: коробка с неровной поверхностью */
+function hedgeGeometry() {
+  const g = new THREE.BoxGeometry(1, 1, 1, 10, 3, 3)
+  const p = g.attributes.position
+  const r = seeded(3)
+  // Одна и та же точка на разных гранях сдвигается одинаково — без щелей
+  const cache = new Map<string, number>()
+  for (let i = 0; i < p.count; i++) {
+    const key = `${p.getX(i).toFixed(3)}|${p.getY(i).toFixed(3)}|${p.getZ(i).toFixed(3)}`
+    let n = cache.get(key)
+    if (n === undefined) {
+      n = (r() - 0.5) * 0.09
+      cache.set(key, n)
+    }
+    p.setXYZ(i, p.getX(i) * (1 + n), p.getY(i) * (1 + n * 0.7), p.getZ(i) * (1 + n))
+  }
+  g.computeVertexNormals()
+  return g
+}
+
+/** Штора со складками */
+function curtainGeometry(w: number, h: number) {
+  const g = new THREE.PlaneGeometry(w, h, 24, 1)
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin((pos.getX(i) / w) * Math.PI * 10) * 0.05)
+  g.computeVertexNormals()
+  return g
+}
+
+const MODULE = 2
 
 export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
-  const pavers = useMemo(() => paversTexture([9, 4]), [])
-  const deck = useMemo(() => planksTexture([6, 4], false), [])
   const T = TERRACE
   const midZ = (T.zFront + T.zBack) / 2
   const DECK_Y = 0.2
+  const tex = useMemo(
+    () => ({
+      // брусок ≈ 0.2 × 0.1 м, как настоящая плитка площади
+      pavers: paversTexture([22, 9]),
+      deck: planksTexture([6, 4], false),
+      slats: slatsTexture([2, 1]),
+      screen: slatsTexture([3, 2], true),
+      concrete: concreteTexture(),
+      weave: weaveTexture([7, 2]),
+    }),
+    [],
+  )
 
-  // Маркизы: сетка панелей, панель пропускается, если сквозь неё растёт дерево
+  const geos = useMemo(
+    () => ({
+      box: new THREE.BoxGeometry(1, 1, 1),
+      hedge: hedgeGeometry(),
+      pleat: pleatGeometry(2.34, 2.74),
+      // плетёное кресло-корзинка: спинка — открытый полуцилиндр, низ — конус
+      // без крышек; оба сквозные за счёт плетёнки с просветами
+      tubBack: new THREE.CylinderGeometry(0.35, 0.31, 0.5, 20, 1, true, -Math.PI * 0.62, Math.PI * 1.24),
+      tubSkirt: new THREE.CylinderGeometry(0.31, 0.22, 0.42, 16, 1, true),
+      cushion: new THREE.CylinderGeometry(0.28, 0.28, 0.09, 14),
+      leg: new THREE.CylinderGeometry(0.035, 0.035, 1, 6),
+      bloom: new THREE.IcosahedronGeometry(1, 0),
+      curtain: curtainGeometry(1.3, T.roofY - 0.1),
+    }),
+    [T.roofY],
+  )
+  const mats = useMemo(
+    () => ({
+      awning: new THREE.MeshStandardMaterial({ color: '#d8cdb6', roughness: 0.9, side: THREE.DoubleSide }),
+      rib: new THREE.MeshStandardMaterial({ color: '#19191b', roughness: 0.95 }),
+      planter: new THREE.MeshStandardMaterial({ map: tex.slats, roughness: 0.8 }),
+      hedge: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }),
+      concrete: new THREE.MeshStandardMaterial({ map: tex.concrete, roughness: 0.95 }),
+      screen: new THREE.MeshStandardMaterial({ map: tex.screen, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 }),
+      tableWood: new THREE.MeshStandardMaterial({ color: '#c08a52', roughness: 0.55 }),
+      rattan: new THREE.MeshStandardMaterial({ map: tex.weave, alphaTest: 0.5, roughness: 1, side: THREE.DoubleSide }),
+      cushion: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
+      bloom: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }),
+      red: new THREE.MeshStandardMaterial({ color: '#a4151f', roughness: 0.85, side: THREE.DoubleSide }),
+      redSeat: new THREE.MeshStandardMaterial({ color: '#b5202a', roughness: 0.7 }),
+      sofa: new THREE.MeshStandardMaterial({ color: '#8d8b86', roughness: 0.95 }),
+      frameWood: new THREE.MeshStandardMaterial({ color: '#9a6436', roughness: 0.6 }),
+      orange: new THREE.MeshStandardMaterial({ color: '#e0803f', roughness: 0.9 }),
+    }),
+    [tex],
+  )
+
+  // ── маркизы: панели, кроме тех, сквозь которые растут деревья ──
   const awning = useMemo(() => {
     const cells: THREE.Matrix4[] = []
-    const pw = 2.4
-    const pd = 2.8
-    for (let x = T.x0 + pw / 2; x < T.x1; x += pw) {
-      for (let z = T.zFront - pd / 2; z > T.zBack; z -= pd) {
-        if (TREES.some((t) => Math.abs(t.x - x) < 1.9 && Math.abs(t.z - z) < 2)) continue
-        cells.push(mat([x, T.roofY, z], [pw - 0.06, 1, pd - 0.06]))
+    for (let x = T.x0 + 1.2; x < T.x1; x += 2.4) {
+      for (let z = T.zFront - 1.4; z > T.zBack; z -= 2.8) {
+        if (TREES.some((t) => t.planter && Math.abs(t.x - x) < 1.9 && Math.abs(t.z - z) < 2)) continue
+        cells.push(mat([x, T.roofY, z]))
       }
     }
     return cells
   }, [T])
 
-  const furniture = useMemo(() => {
+  // ── фасад и правый бок: рама из стоек, ящики с кустарником ──
+  const fence = useMemo(() => {
+    const r = seeded(11)
+    const boxes: THREE.Matrix4[] = []
+    const hedges: THREE.Matrix4[] = []
+    const hedgeColors: THREE.Color[] = []
+    const posts: THREE.Matrix4[] = []
+    const rails: THREE.Matrix4[] = []
+    const addRun = (from: number, to: number, fixed: number, alongX: boolean) => {
+      const n = Math.round(Math.abs(to - from) / MODULE)
+      const dir = Math.sign(to - from)
+      for (let i = 0; i < n; i++) {
+        const c = from + dir * (i + 0.5) * MODULE
+        const [x, z] = alongX ? [c, fixed] : [fixed, c]
+        const ry = alongX ? 0 : Math.PI / 2
+        boxes.push(mat([x, 0.28, z], [MODULE - 0.14, 0.56, 0.5], ry))
+        hedges.push(mat([x, 0.78, z], [MODULE - 0.24, 0.46, 0.44], ry))
+        hedgeColors.push(new THREE.Color().setHSL(0.27 + r() * 0.04, 0.45, 0.2 + r() * 0.05))
+      }
+      for (let i = 0; i <= n; i++) {
+        const c = from + dir * i * MODULE
+        const [x, z] = alongX ? [c, fixed] : [fixed, c]
+        posts.push(mat([x, 0.55, z], [0.07, 1.1, 0.07]))
+      }
+      const mid = (from + to) / 2
+      const len = Math.abs(to - from)
+      rails.push(alongX ? mat([mid, 1.1, fixed], [len, 0.05, 0.06]) : mat([fixed, 1.1, mid], [0.06, 0.05, len]))
+    }
+    const fz = T.zFront + 0.3
+    addRun(-T.entrance, T.x0, fz, true)
+    addRun(T.entrance, T.x1, fz, true)
+    // правый бок открыт к шатру: заборчик только за лаунжем, иначе в кадре 9
+    // кустарник закрывал полкадра снизу
+    addRun(-80, T.zBack, T.x1 + 0.3, false)
+    return { boxes, hedges, hedgeColors, posts, rails }
+  }, [T])
+
+  // ── столы и кресла-бочонки ──
+  const dining = useMemo(() => {
     const r = seeded(9)
-    const tables = [
-      [-9.6, -74.8],
-      [-9.6, -83],
-      [-4, -83.6],
-      [3.8, -75],
-      [9.6, -74.8],
-      [4.6, -84.3],
-      // ближе к центру — видны в кадре входа, но в стороне от пути камеры
-      [-4.4, -79.6],
-      [4, -79.4],
+    // Столы проверены против пути камеры (keyframes.ts), кашпо деревьев и лаунжа
+    const tables: [number, number][] = [
+      [-10.2, -76.6],
+      [-4.6, -75.4],
+      [-10.2, -80.6],
+      [-10, -84.6],
+      [2.6, -77.2],
+      [3, -81.2],
+      [0.2, -84.4],
     ]
-    const tops: THREE.Matrix4[] = []
-    const legs: THREE.Matrix4[] = []
-    const bodies: THREE.Matrix4[] = []
-    const backs: THREE.Matrix4[] = []
-    const cushions: THREE.Matrix4[] = []
-    tables.forEach(([x, z]) => {
-      tops.push(mat([x, DECK_Y + 0.74, z], [1.2, 1, 0.8]))
-      legs.push(mat([x, DECK_Y + 0.37, z], [1, 0.74, 1]))
-      ;[0, Math.PI].forEach((a) => {
-        const ry = a + (r() - 0.5) * 0.3
-        const cx = x + Math.sin(a) * 0.95
+    const palette = ['#8fa3ad', '#e08a5a', '#e6dccb', '#5f9c95'].map((c) => new THREE.Color(c))
+    const out = { tops: [] as THREE.Matrix4[], legs: [] as THREE.Matrix4[], backs: [] as THREE.Matrix4[], skirts: [] as THREE.Matrix4[], cushions: [] as THREE.Matrix4[], cushionColors: [] as THREE.Color[] }
+    tables.forEach(([x, z], ti) => {
+      out.tops.push(mat([x, DECK_Y + 0.75, z], [1.3, 0.05, 0.85]))
+      ;[-0.5, 0.5].forEach((dx) => out.legs.push(mat([x + dx, DECK_Y + 0.37, z], [1, 0.74, 1])))
+      ;[0, Math.PI].forEach((a, k) => {
+        const ry = a + (r() - 0.5) * 0.35
+        const cx = x + Math.sin(a) * 0.95 + (r() - 0.5) * 0.2
         const cz = z + Math.cos(a) * 0.95
-        bodies.push(mat([cx, DECK_Y + 0.24, cz], [1, 1, 1], ry))
-        const bx = cx + Math.sin(a) * 0.3
-        const bz = cz + Math.cos(a) * 0.3
-        backs.push(mat([bx, DECK_Y + 0.62, bz], [1, 1, 1], ry))
-        cushions.push(mat([cx, DECK_Y + 0.5, cz], [1, 1, 1], ry))
+        out.skirts.push(mat([cx, DECK_Y + 0.21, cz], [1, 1, 1], ry))
+        out.backs.push(mat([cx, DECK_Y + 0.62, cz], [1, 1, 1], ry))
+        out.cushions.push(mat([cx, DECK_Y + 0.46, cz], [1, 1, 1], ry))
+        out.cushionColors.push(palette[(ti + k) % palette.length])
       })
     })
-    return { tops, legs, bodies, backs, cushions }
+    return out
   }, [])
 
-  const geos = useMemo(
-    () => ({
-      panel: new THREE.BoxGeometry(1, 0.05, 1),
-      top: new THREE.BoxGeometry(1, 0.05, 1),
-      leg: new THREE.CylinderGeometry(0.05, 0.08, 1, 8),
-      body: new THREE.BoxGeometry(0.72, 0.48, 0.66),
-      back: new THREE.BoxGeometry(0.72, 0.5, 0.1),
-      cushion: new THREE.BoxGeometry(0.62, 0.1, 0.56),
-    }),
-    [],
-  )
-  const mats = useMemo(
-    () => ({
-      awning: new THREE.MeshStandardMaterial({ color: '#d9ccb4', roughness: 0.9, side: THREE.DoubleSide }),
-      wood: new THREE.MeshStandardMaterial({ color: '#8a5a36', roughness: 0.65 }),
-      wicker: new THREE.MeshStandardMaterial({ color: '#9c8360', roughness: 1 }),
-      cushion: new THREE.MeshStandardMaterial({ color: '#d99a8c', roughness: 0.95 }),
-      rib: new THREE.MeshStandardMaterial({ color: '#1a1a1c', roughness: 0.95 }),
-    }),
-    [],
-  )
+  // ── облако искусственных цветов над лаунжем ──
+  const blooms = useMemo(() => {
+    const r = seeded(29)
+    const items: THREE.Matrix4[] = []
+    const colors: THREE.Color[] = []
+    const palette = ['#e9a3b8', '#f3eee6', '#c7849a', '#f6c6d2', '#5f7f47', '#7d9a5c'].map((c) => new THREE.Color(c))
+    // Много мелких «цветков», а не десяток крупных: крупные вблизи
+    // выглядели как летающие камни
+    const n = quality === 'high' ? 620 : 300
+    for (let i = 0; i < n; i++) {
+      const x = 8.6 + r() * 3.2
+      const z = -76.8 - r() * 5.6
+      // гуще у крыши, редкие «плети» свисают ниже
+      const y = T.roofY - 0.1 - Math.pow(r(), 2.4) * 0.85
+      const s = 0.03 + r() * 0.05
+      items.push(mat([x, y, z], [s, s, s], r() * 3, r() * 3))
+      colors.push(palette[Math.floor(r() * palette.length)])
+    }
+    return { items, colors }
+  }, [T.roofY, quality])
 
-  const planters = useMemo(() => {
-    const out: number[] = []
-    for (let x = T.x0 + 0.9; x < T.x1; x += 1.9) if (Math.abs(x) > T.entrance + 0.6) out.push(x)
-    return out
-  }, [T])
+  // ── цветы в ящиках вдоль фасада зала ──
+  const flowerBed = useMemo(() => {
+    const r = seeded(41)
+    const boxes: THREE.Matrix4[] = []
+    const leaves: THREE.Matrix4[] = []
+    const colors: THREE.Color[] = []
+    const palette = ['#6b2a4a', '#a3243a', '#3f7a36', '#7fa84a', '#4c6b35'].map((c) => new THREE.Color(c))
+    for (const x of [-11.6, -9.6, 7.6, 9.6]) {
+      boxes.push(mat([x + 1, 0.2 + DECK_Y, T.zBack + 0.45], [1.9, 0.4, 0.5]))
+      for (let k = 0; k < 9; k++) {
+        const s = 0.16 + r() * 0.14
+        leaves.push(mat([x + 0.15 + r() * 1.7, 0.55 + DECK_Y + r() * 0.2, T.zBack + 0.45 + (r() - 0.5) * 0.35], [s, s * 0.8, s], r() * 3))
+        colors.push(palette[Math.floor(r() * palette.length)])
+      }
+    }
+    return { boxes, leaves, colors }
+  }, [T.zBack])
 
   const posts = [T.x0, -7.2, -T.entrance - 0.2, T.entrance + 0.2, 7.2, T.x1]
 
-  const festoonSpans = useMemo<[number, number, number, number, number, number][]>(() => {
-    const s: [number, number, number, number, number, number][] = [
-      [T.x0, T.roofY - 0.1, T.zFront, -T.entrance, T.roofY - 0.1, T.zFront],
-      [T.entrance, T.roofY - 0.1, T.zFront, T.x1, T.roofY - 0.1, T.zFront],
-      [-12, 3.6, -62, -3.8, 3.4, -65.5],
-      [-3.8, 3.4, -65.5, 11, 3.5, -60],
-      [11, 3.5, -60, 16, 3.6, -70],
-      [-3.8, 3.4, -65.5, -2, T.roofY - 0.1, T.zFront],
-      [11, 3.5, -60, 7.2, T.roofY - 0.1, T.zFront],
-      [-12, 3.6, -62, -7.2, T.roofY - 0.1, T.zFront],
+  const festoonSpans = useMemo<Span[]>(() => {
+    const top = 4.6
+    const eave = T.roofY + 0.05
+    const [pA, pB, pC, pD] = POLES
+    return [
+      // над площадью — параллельно, от столбов к козырьку террасы
+      [pA[0], top, pA[1], -10.5, eave, T.zFront],
+      [pB[0], top, pB[1], -5, eave, T.zFront],
+      [pC[0], top, pC[1], 5, eave, T.zFront],
+      [pD[0], top, pD[1], 10.5, eave, T.zFront],
+      [pA[0], top, pA[1], pB[0], top, pB[1]],
+      [pB[0], top, pB[1], pC[0], top, pC[1]],
+      [pC[0], top, pC[1], pD[0], top, pD[1]],
+      // к деревьям по краям площади
+      [-17, 4.4, -65, pA[0], top, pA[1]],
+      [17.5, 4.4, -66.5, pD[0], top, pD[1]],
+      [-17, 4.4, -65, T.x0, eave, T.zFront],
+      [17.5, 4.4, -66.5, T.x1, eave, T.zFront],
+      // по кромке маркиз
+      [T.x0, eave, T.zFront, -T.entrance, eave, T.zFront],
+      [T.entrance, eave, T.zFront, T.x1, eave, T.zFront],
       // под маркизами: ряды лампочек поперёк террасы
       [T.x0, T.roofY - 0.12, -76, T.x1, T.roofY - 0.12, -76],
       [T.x0, T.roofY - 0.12, -80.5, T.x1, T.roofY - 0.12, -80.5],
-      [T.x0, T.roofY - 0.12, -85, T.x1, T.roofY - 0.12, -85],
     ]
-    return s
   }, [T])
 
   return (
@@ -183,18 +326,73 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       {/* площадь */}
       <mesh rotation-x={-Math.PI / 2} position={[(SQUARE.x0 + SQUARE.x1) / 2, 0.015, (SQUARE.zNear + SQUARE.zFar) / 2]}>
         <planeGeometry args={[SQUARE.x1 - SQUARE.x0, SQUARE.zNear - SQUARE.zFar]} />
-        <meshStandardMaterial map={pavers} roughness={0.85} />
+        <meshStandardMaterial map={tex.pavers} roughness={0.85} />
       </mesh>
 
-      {/* настил террасы */}
+      {/* столбы гирлянд */}
+      {POLES.map(([x, z]) => (
+        <mesh key={x} position={[x, 2.35, z]} material={steel}>
+          <cylinderGeometry args={[0.05, 0.07, 4.7, 8]} />
+        </mesh>
+      ))}
+
+      {/* лавочки у заборчика: деревянные рейки на чёрных опорах */}
+      {[-7.4, -14.6, 14.6].map((x) => (
+        <group key={x} position={[x, 0, T.zFront + 1.45]}>
+          <mesh position={[0, 0.45, 0]} material={mats.frameWood}>
+            <boxGeometry args={[1.8, 0.06, 0.46]} />
+          </mesh>
+          <mesh position={[0, 0.78, -0.22]} rotation-x={-0.12} material={mats.frameWood}>
+            <boxGeometry args={[1.8, 0.34, 0.05]} />
+          </mesh>
+          {[-0.78, 0.78].map((dx) => (
+            <mesh key={dx} position={[dx, 0.4, -0.04]} material={steel}>
+              <boxGeometry args={[0.06, 0.8, 0.5]} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* настил, ступень у входа и зелёный коврик */}
       <mesh position={[0, DECK_Y / 2, midZ]}>
         <boxGeometry args={[T.x1 - T.x0, DECK_Y, T.zFront - T.zBack]} />
-        <meshStandardMaterial map={deck} roughness={0.75} />
+        <meshStandardMaterial map={tex.deck} roughness={0.75} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, T.zFront + 1]}>
-        <planeGeometry args={[2.2, 1.6]} />
-        <meshStandardMaterial color="#2f6b2c" roughness={1} />
+      <mesh position={[0, 0.06, T.zFront + 0.4]}>
+        <boxGeometry args={[T.entrance * 2 + 0.4, 0.12, 0.8]} />
+        <meshStandardMaterial map={tex.deck} roughness={0.75} />
       </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, T.zFront + 1.55]}>
+        <planeGeometry args={[2.6, 1.4]} />
+        <meshStandardMaterial color="#2f8a36" roughness={1} />
+      </mesh>
+
+      {/* заборчик: ящики, кустарник, стойки и поручень */}
+      <Instances items={fence.boxes} geometry={geos.box} material={mats.planter} />
+      <Instances items={fence.hedges} geometry={geos.hedge} material={mats.hedge} colors={fence.hedgeColors} />
+      <Instances items={fence.posts} geometry={geos.box} material={steel} />
+      <Instances items={fence.rails} geometry={geos.box} material={steel} />
+
+      {/* бетонные кубы с деревцами по бокам входа */}
+      {[-2.95, 2.95, -12.9].map((x, i) => (
+        <group key={x} position={[x, 0, i < 2 ? T.zFront + 1.1 : T.zFront + 1.2]}>
+          <mesh position={[0, 0.5, 0]} material={mats.concrete}>
+            <boxGeometry args={[1, 1, 1]} />
+          </mesh>
+          <mesh position={[0, 1.02, 0]}>
+            <boxGeometry args={[0.9, 0.04, 0.9]} />
+            <meshStandardMaterial color="#231a12" roughness={1} />
+          </mesh>
+          <mesh position={[0, 1.8, 0]}>
+            <cylinderGeometry args={[0.045, 0.06, 1.6, 6]} />
+            <meshStandardMaterial color="#4a3a2c" roughness={1} />
+          </mesh>
+          <mesh position={[0, 2.85, 0]} scale={[0.8, 0.72, 0.8]}>
+            <icosahedronGeometry args={[1, 2]} />
+            <meshStandardMaterial color={i === 1 ? '#6b3a2e' : '#3f6e34'} roughness={1} flatShading />
+          </mesh>
+        </group>
+      ))}
 
       {/* каркас и маркизы */}
       {posts.map((x) => (
@@ -208,84 +406,145 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         </mesh>
       ))}
       {Array.from({ length: 11 }, (_, i) => T.x0 + i * 2.4).map((x) => (
-        <mesh key={x} position={[x, T.roofY + 0.05, midZ]} material={mats.rib}>
+        <mesh key={x} position={[x, T.roofY + 0.04, midZ]} material={mats.rib}>
           <boxGeometry args={[0.08, 0.12, T.zFront - T.zBack]} />
         </mesh>
       ))}
-      <Instances items={awning} geometry={geos.panel} material={mats.awning} />
+      <Instances items={awning} geometry={geos.pleat} material={mats.awning} />
 
-      {/* фасад: кашпо с кустами и цветами, чёрный заборчик */}
-      {planters.map((x, i) => (
-        <group key={x} position={[x, 0, T.zFront + 0.45]}>
-          <mesh position={[0, 0.32, 0]}>
-            <boxGeometry args={[1.7, 0.64, 0.7]} />
-            <meshStandardMaterial color="#6b4a30" roughness={0.8} />
-          </mesh>
-          {[-0.45, 0.1, 0.55].map((dx, k) => (
-            <mesh key={dx} position={[dx, 0.85, 0]} scale={[0.5, 0.42, 0.4]}>
-              <icosahedronGeometry args={[1, 1]} />
-              <meshStandardMaterial color={k % 2 ? '#2c5a2a' : '#3b6e32'} roughness={1} />
-            </mesh>
-          ))}
-          {quality === 'high' &&
-            [-0.6, -0.2, 0.3, 0.65].map((dx, k) => (
-              <mesh key={dx} position={[dx, 1.05 + (k % 2) * 0.1, 0.18]}>
-                <sphereGeometry args={[0.07, 8, 6]} />
-                <meshStandardMaterial color={['#d8344a', '#f07aa0', '#f4f0e6', '#d8344a'][(k + i) % 4]} roughness={0.7} />
-              </mesh>
-            ))}
-        </group>
-      ))}
-      {[
-        [(T.x0 - T.entrance) / 2, T.x0 + T.entrance],
-        [(T.x1 + T.entrance) / 2, T.x1 - T.entrance],
-      ].map(([cx, w]) => (
-        <mesh key={cx} position={[cx, 0.9, T.zFront - 0.05]} material={steel}>
-          <boxGeometry args={[Math.abs(w), 0.05, 0.05]} />
+      {/* левый бок — реечная перегородка во всю длину */}
+      <mesh position={[T.x0 - 0.05, 1.25 + DECK_Y, midZ]} rotation-y={Math.PI / 2} material={mats.screen}>
+        <planeGeometry args={[T.zFront - T.zBack, 2.5]} />
+      </mesh>
+      {[T.zFront, -79, T.zBack].map((z) => (
+        <mesh key={z} position={[T.x0 - 0.05, 1.45, z]} material={steel}>
+          <boxGeometry args={[0.1, 2.9, 0.1]} />
         </mesh>
       ))}
 
-      {/* кадки с деревцами на настиле */}
+      {/* кресла и столы */}
+      <Instances items={dining.tops} geometry={geos.box} material={mats.tableWood} />
+      <Instances items={dining.legs} geometry={geos.leg} material={steel} />
+      <Instances items={dining.skirts} geometry={geos.tubSkirt} material={mats.rattan} />
+      <Instances items={dining.backs} geometry={geos.tubBack} material={mats.rattan} />
+      <Instances items={dining.cushions} geometry={geos.cushion} material={mats.cushion} colors={dining.cushionColors} />
+
+      {/* плетёные подвесные лампы-корзины над столами */}
       {[
-        [-4.2, -75.6],
-        [2.6, -82.6],
+        [-4.6, -75.4],
+        [2.6, -77.2],
+        [3, -81.2],
       ].map(([x, z]) => (
-        <group key={x} position={[x, DECK_Y, z]}>
-          <mesh position={[0, 0.4, 0]}>
-            <boxGeometry args={[0.8, 0.8, 0.8]} />
-            <meshStandardMaterial color="#b9b6ae" roughness={0.95} />
+        <group key={x} position={[x, T.roofY, z]}>
+          <mesh position={[0, -0.35, 0]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.7, 3]} />
+            <meshBasicMaterial color="#111" />
           </mesh>
-          <mesh position={[0, 1.3, 0]}>
-            <cylinderGeometry args={[0.04, 0.05, 1.2, 6]} />
-            <meshStandardMaterial color="#4a3a2c" />
+          <mesh position={[0, -0.72, 0]}>
+            <sphereGeometry args={[0.36, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#b88b4a" roughness={1} wireframe />
           </mesh>
-          <mesh position={[0, 2.1, 0]} scale={[0.75, 0.65, 0.75]}>
-            <icosahedronGeometry args={[1, 1]} />
-            <meshStandardMaterial color="#3f7434" roughness={1} />
+          <mesh position={[0, -0.82, 0]}>
+            <sphereGeometry args={[0.07, 8, 6]} />
+            <meshBasicMaterial color={[5, 3, 1.2]} toneMapped={false} />
           </mesh>
+          {[0, 1, 2, 3, 4].map((k) => (
+            <mesh key={k} position={[Math.cos(k * 1.26) * 0.3, -0.78 - (k % 2) * 0.12, Math.sin(k * 1.26) * 0.3]} scale={0.12}>
+              <icosahedronGeometry args={[1, 0]} />
+              <meshStandardMaterial color="#4f7a3c" roughness={1} flatShading />
+            </mesh>
+          ))}
         </group>
       ))}
 
-      {/* мебель */}
-      <Instances items={furniture.tops} geometry={geos.top} material={mats.wood} />
-      <Instances items={furniture.legs} geometry={geos.leg} material={steel} />
-      <Instances items={furniture.bodies} geometry={geos.body} material={mats.wicker} />
-      <Instances items={furniture.backs} geometry={geos.back} material={mats.wicker} />
-      <Instances items={furniture.cushions} geometry={geos.cushion} material={mats.cushion} />
+      {/* ── лаунж справа ── */}
+      {/* реечная перегородка позади и красные шторы на стойках */}
+      <mesh position={[10.2, 1.3 + DECK_Y, -82.8]} material={mats.screen}>
+        <planeGeometry args={[3.6, 2.6]} />
+      </mesh>
+      {[
+        // в глубине лаунжа: ближе к фасаду штора закрывала бы шатёр в кадре 9
+        [T.x1 - 0.1, -81.8, -Math.PI / 2],
+        [8.5, -82.6, 0],
+        [T.x0 + 0.6, T.zFront - 0.3, 0],
+      ].map(([x, z, ry]) => (
+        <mesh key={`${x}${z}`} geometry={geos.curtain} material={mats.red} position={[x, T.roofY / 2 + 0.05, z]} rotation-y={ry} />
+      ))}
+      {/* диваны: деревянная рама, серые подушки, оранжевые подушечки */}
+      {[
+        [10.6, -77.4, Math.PI],
+        [10.6, -82, 0],
+      ].map(([x, z, ry]) => (
+        <group key={z} position={[x, DECK_Y, z]} rotation-y={ry}>
+          <mesh position={[0, 0.22, 0]} material={mats.frameWood}>
+            <boxGeometry args={[2.1, 0.12, 0.85]} />
+          </mesh>
+          <mesh position={[0, 0.36, 0.04]} material={mats.sofa}>
+            <boxGeometry args={[1.9, 0.16, 0.72]} />
+          </mesh>
+          <mesh position={[0, 0.66, -0.34]} rotation-x={-0.12} material={mats.sofa}>
+            <boxGeometry args={[1.9, 0.5, 0.16]} />
+          </mesh>
+          {[-1.02, 1.02].map((dx) => (
+            <mesh key={dx} position={[dx, 0.4, 0]} material={mats.frameWood}>
+              <boxGeometry args={[0.1, 0.5, 0.85]} />
+            </mesh>
+          ))}
+          {[-0.5, 0.45].map((dx) => (
+            <mesh key={dx} position={[dx, 0.6, -0.22]} rotation={[-0.3, 0, dx * 0.2]} material={mats.orange}>
+              <boxGeometry args={[0.42, 0.36, 0.12]} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      <mesh position={[10.6, DECK_Y + 0.42, -79.7]} material={mats.frameWood}>
+        <boxGeometry args={[1.5, 0.06, 0.8]} />
+      </mesh>
+      {/* красные кресла на гнутых деревянных полозьях */}
+      {[
+        [9.1, -79, Math.PI / 2 + 0.2],
+        [9.1, -80.4, Math.PI / 2 - 0.2],
+      ].map(([x, z, ry]) => (
+        <group key={z} position={[x, DECK_Y, z]} rotation-y={ry}>
+          {[-0.3, 0.3].map((dx) => (
+            <mesh key={dx} position={[dx, 0.38, 0]} rotation-y={Math.PI / 2} material={mats.frameWood}>
+              <torusGeometry args={[0.36, 0.03, 6, 14, Math.PI]} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.46, 0.05]} rotation-x={0.12} material={mats.redSeat}>
+            <boxGeometry args={[0.6, 0.14, 0.6]} />
+          </mesh>
+          <mesh position={[0, 0.78, -0.26]} rotation-x={-0.4} material={mats.redSeat}>
+            <boxGeometry args={[0.6, 0.55, 0.14]} />
+          </mesh>
+        </group>
+      ))}
+      <Instances items={blooms.items} geometry={geos.bloom} material={mats.bloom} colors={blooms.colors} />
+
+      {/* ящики с цветами вдоль стеклянного фасада зала */}
+      <Instances items={flowerBed.boxes} geometry={geos.box} material={mats.planter} />
+      <Instances items={flowerBed.leaves} geometry={geos.bloom} material={mats.bloom} colors={flowerBed.colors} />
 
       {/* обогреватели-пирамиды */}
+      {/* у левой перегородки: в центре террасы трубка стояла прямо в кадре 3 */}
       {[
-        [-11.2, -79],
-        [11.2, -79],
+        [-11.3, -78.6],
+        [-11.3, -82.4],
       ].map(([x, z]) => (
         <group key={x} position={[x, DECK_Y, z]}>
           <mesh position={[0, 1.15, 0]} rotation-y={Math.PI / 4}>
             <coneGeometry args={[0.36, 2.3, 4, 1, true]} />
             <meshStandardMaterial color="#1c1c1f" metalness={0.8} roughness={0.35} wireframe />
           </mesh>
+          {/* пламя в стеклянной трубке: тонкое и приглушённое, иначе bloom
+              превращал его в светящийся «меч» через весь кадр */}
           <mesh position={[0, 1.1, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, 1.5, 8]} />
-            <meshBasicMaterial color={[5, 1.6, 0.35]} toneMapped={false} />
+            <cylinderGeometry args={[0.022, 0.03, 1.3, 8]} />
+            <meshBasicMaterial color={[1.5, 0.5, 0.1]} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, 1.1, 0]}>
+            <cylinderGeometry args={[0.07, 0.07, 1.5, 12, 1, true]} />
+            <meshStandardMaterial color="#ffd9b0" transparent opacity={0.14} roughness={0.1} depthWrite={false} />
           </mesh>
           <mesh position={[0, 2.32, 0]} rotation-y={Math.PI / 4}>
             <coneGeometry args={[0.28, 0.25, 4]} />
@@ -296,32 +555,35 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
 
       {/* белые фонари-домики со свечой */}
       {[
-        [-2.6, DECK_Y, -73],
-        [2.6, DECK_Y, -73],
-        [-11.3, DECK_Y, -85],
-        [11.3, DECK_Y, -85.2],
-        [-7.8, DECK_Y, -79.5],
-      ].map(([x, y, z]) => (
-        <group key={`${x}${z}`} position={[x, y, z]}>
-          <mesh position={[0, 0.3, 0]}>
-            <boxGeometry args={[0.34, 0.6, 0.34]} />
-            <meshStandardMaterial color="#f1ede4" roughness={0.6} transparent opacity={0.88} />
+        [-2.7, -72.7],
+        [2.7, -72.7],
+        [-11.4, -85.4],
+        [5, -79.2],
+      ].map(([x, z]) => (
+        <group key={`${x}${z}`} position={[x, DECK_Y, z]}>
+          <mesh position={[0, 0.34, 0]}>
+            <boxGeometry args={[0.34, 0.62, 0.34]} />
+            <meshStandardMaterial color="#f1ede4" roughness={0.6} transparent opacity={0.85} />
           </mesh>
-          <mesh position={[0, 0.72, 0]} rotation-y={Math.PI / 4}>
-            <coneGeometry args={[0.3, 0.26, 4]} />
+          <mesh position={[0, 0.78, 0]}>
+            <sphereGeometry args={[0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <meshStandardMaterial color="#f1ede4" roughness={0.6} />
           </mesh>
-          <mesh position={[0, 0.22, 0]}>
+          <mesh position={[0, 1.02, 0]}>
+            <torusGeometry args={[0.06, 0.015, 6, 12]} />
+            <meshStandardMaterial color="#f1ede4" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.24, 0]}>
             <sphereGeometry args={[0.05, 8, 6]} />
             <meshBasicMaterial color={[6, 3, 1]} toneMapped={false} />
           </mesh>
         </group>
       ))}
 
-      <Festoons spans={festoonSpans} per={quality === 'high' ? 14 : 8} />
-      {/* Лампа ниже и в стороне от рёбер маркизы: под ребром на x=0 она
-          давала яркий блик-полосу через весь кадр входа на террасу */}
-      <pointLight position={[-3.5, 2.1, -80]} color="#ffb870" intensity={10} distance={12} decay={1.5} />
+      <Festoons spans={festoonSpans} density={quality === 'high' ? 1.6 : 1} />
+      {/* Лампа в стороне от рёбер маркиз: прямо под ребром она давала
+          яркую полосу-блик через весь кадр входа на террасу */}
+      <pointLight position={[3.6, 2.2, -80.5]} color="#ffb870" intensity={10} distance={13} decay={1.5} />
     </group>
   )
 }

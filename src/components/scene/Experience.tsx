@@ -14,6 +14,7 @@ import { LanternTrees } from './LanternTrees'
 import { LoftSign } from './LoftSign'
 import { Gazebo } from './Gazebo'
 import { Carousel } from './Carousel'
+import { Attractions } from './Attractions'
 import { Dishes } from './Dishes'
 import { fx } from './fx'
 
@@ -84,6 +85,7 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
       <Hall />
       <Gazebo />
       <Carousel />
+      <Attractions quality={quality} />
       <Dishes />
       <ReadySignal />
       {!flags.nofx && <Effects />}

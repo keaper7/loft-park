@@ -42,7 +42,7 @@ function DishCard({ dish, index }: { dish: Dish; index: number }) {
       layout
       initial={{ opacity: 0, y: 30, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
+      exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.6, ease: EASE, delay: Math.min(index, 12) * 0.03 }}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
@@ -115,7 +115,7 @@ export function Menu() {
           </p>
         </div>
 
-        <div className="sticky top-[84px] z-20 -mx-2 mt-10 flex flex-col gap-3 rounded-2xl bg-ink/85 p-2 backdrop-blur-xl md:flex-row md:items-center">
+        <div className="sticky top-[84px] z-20 -mx-2 mt-10 flex flex-col gap-3 rounded-2xl bg-ink/95 p-2 md:flex-row md:items-center">
           <LayoutGroup id="menu-tabs">
             <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню">
               {menu.map((c) => {

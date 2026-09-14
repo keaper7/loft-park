@@ -8,6 +8,7 @@ import { Cursor } from '@/components/Cursor'
 import { Nav } from '@/components/Nav'
 import { ScrollProgress } from '@/components/ScrollProgress'
 import { OrderTray } from '@/components/OrderTray'
+import { Grain } from '@/components/Grain'
 import './globals.css'
 
 // Кириллица обязательна: без сабсета Next подгрузит только латиницу
@@ -51,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <OrderTray />
-        <div className="grain" aria-hidden="true" />
+        <Grain />
       </body>
     </html>
   )

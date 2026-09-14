@@ -90,7 +90,7 @@ export function Nav() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-40 flex flex-col justify-between bg-ink/95 px-[var(--pad)] pb-10 pt-32 backdrop-blur-xl lg:hidden"
+            className="fixed inset-0 z-40 flex flex-col justify-between bg-ink/[0.97] px-[var(--pad)] pb-10 pt-32 lg:hidden"
             initial={{ clipPath: 'circle(0% at 92% 6%)' }}
             animate={{ clipPath: 'circle(150% at 92% 6%)' }}
             exit={{ clipPath: 'circle(0% at 92% 6%)' }}

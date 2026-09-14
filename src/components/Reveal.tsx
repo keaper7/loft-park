@@ -22,8 +22,10 @@ export function Reveal({
   return (
     <motion.div
       className={className}
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y, filter: 'blur(8px)' }}
-      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      // Без filter: blur — анимация фильтра стартует прямо во время прокрутки,
+      // и слой с фильтром поверх WebGL-холста мигал чёрными прямоугольниками
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: reduced ? 0.2 : 1, ease: EASE, delay: reduced ? 0 : delay }}
     >

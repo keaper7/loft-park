@@ -37,7 +37,9 @@ export function CameraRig() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1)
     const last = KEYFRAMES.length - 1
-    const c = THREE.MathUtils.clamp(pinned ?? scrollState.cam, 0, last)
+    // window.__loftCam — то же, что ?cam, но меняется на лету (скрипты проверки кадров)
+    const live = (window as unknown as { __loftCam?: number }).__loftCam
+    const c = THREE.MathUtils.clamp(live ?? pinned ?? scrollState.cam, 0, last)
     const i = Math.min(Math.floor(c), last - 1)
     const t = smooth(THREE.MathUtils.clamp(c - i, 0, 1))
     const a = KEYFRAMES[i]

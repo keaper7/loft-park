@@ -52,7 +52,7 @@ function Row({ dir, tilt, serif }: { dir: 1 | -1; tilt: number; serif?: boolean 
 
 export function Marquee() {
   return (
-    <div aria-hidden="true" className="relative -my-10 overflow-hidden bg-ink/80 py-16 backdrop-blur-sm">
+    <div aria-hidden="true" className="relative -my-10 overflow-hidden bg-ink/90 py-16">
       <div className="border-y border-[var(--hair)] bg-brick/30">
         <Row dir={1} tilt={0} />
       </div>

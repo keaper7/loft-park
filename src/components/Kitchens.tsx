@@ -52,9 +52,9 @@ export function Kitchens() {
               <motion.h3
                 key={k.id}
                 className="display absolute left-0 top-0 text-[clamp(42px,11vw,190px)]"
-                initial={{ y: '100%', opacity: 0, filter: 'blur(12px)' }}
-                animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-                exit={{ y: '-100%', opacity: 0, filter: 'blur(12px)' }}
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: '0%', opacity: 1 }}
+                exit={{ y: '-100%', opacity: 0 }}
                 transition={{ duration: 0.9, ease: EASE }}
               >
                 {k.name}

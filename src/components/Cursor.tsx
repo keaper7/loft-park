@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 
 /**
  * Курсор — «фонарик»: точка, кольцо с запаздыванием и большое тёплое
- * пятно, которое подсвечивает страницу под собой (mix-blend: screen).
+ * пятно, которое подсвечивает страницу под собой.
  * Над элементами с data-cursor="Текст" кольцо раскрывается в подпись.
  * Только для мыши: на тач-экранах компонент ничего не рисует.
  */
@@ -60,8 +60,9 @@ export function Cursor() {
           y: gy,
           translateX: '-50%',
           translateY: '-50%',
-          background: 'radial-gradient(circle, rgba(255,170,90,0.12), rgba(255,140,60,0.04) 40%, transparent 70%)',
-          mixBlendMode: 'screen',
+          // Без mix-blend-mode: screen поверх WebGL-холста при прокрутке давал
+          // мигающие тёмные квадраты размером с само пятно
+          background: 'radial-gradient(circle, rgba(255,170,90,0.08), rgba(255,140,60,0.025) 40%, transparent 70%)',
         }}
       />
       <motion.div

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
@@ -63,12 +64,14 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
   return (
     <Canvas
       dpr={dpr}
-      gl={{ antialias: false, powerPreference: 'high-performance', stencil: false }}
+      // alpha: false — холст непрозрачный и не смешивается со страницей:
+      // пиксели с «потерянной» альфой в bloom не просвечивают чёрным фоном body
+      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', stencil: false }}
       // near 0.25, а не 0.1: точность глубины вдали вырастает вдвое с лишним,
       // плоскости плитки и световых пятен у земли перестают мерцать
       camera={{ fov: 55, near: 0.25, far: 420, position: [0, 2.2, 16] }}
       onCreated={(state) => {
-        if (flags.debug) (window as unknown as { __loft: unknown }).__loft = { state, fx }
+        if (flags.debug) (window as unknown as { __loft: unknown }).__loft = { state, fx, THREE }
       }}
     >
       <color attach="background" args={['#07090d']} />

@@ -69,7 +69,7 @@ export function Preloader() {
             transition={{ duration: 1.1, ease: EASE }}
           />
 
-          <motion.div className="relative flex flex-col items-center" exit={{ opacity: 0, scale: 1.08, filter: 'blur(10px)' }} transition={{ duration: 0.6 }}>
+          <motion.div className="relative flex flex-col items-center" exit={{ opacity: 0, scale: 1.08 }} transition={{ duration: 0.6 }}>
             <svg viewBox="0 0 900 180" className="w-[min(86vw,820px)] overflow-visible" role="img" aria-label="Loft Park">
               <defs>
                 <filter id="neon-glow" x="-20%" y="-50%" width="140%" height="200%">

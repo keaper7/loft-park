@@ -324,7 +324,7 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
   return (
     <group>
       {/* площадь */}
-      <mesh rotation-x={-Math.PI / 2} position={[(SQUARE.x0 + SQUARE.x1) / 2, 0.015, (SQUARE.zNear + SQUARE.zFar) / 2]}>
+      <mesh rotation-x={-Math.PI / 2} position={[(SQUARE.x0 + SQUARE.x1) / 2, 0.035, (SQUARE.zNear + SQUARE.zFar) / 2]}>
         <planeGeometry args={[SQUARE.x1 - SQUARE.x0, SQUARE.zNear - SQUARE.zFar]} />
         <meshStandardMaterial map={tex.pavers} roughness={0.85} />
       </mesh>
@@ -362,7 +362,7 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         <boxGeometry args={[T.entrance * 2 + 0.4, 0.12, 0.8]} />
         <meshStandardMaterial map={tex.deck} roughness={0.75} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, T.zFront + 1.55]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.07, T.zFront + 1.55]}>
         <planeGeometry args={[2.6, 1.4]} />
         <meshStandardMaterial color="#2f8a36" roughness={1} />
       </mesh>

@@ -115,7 +115,7 @@ export function Carousel() {
           <meshStandardMaterial color="#ffffff" roughness={0.5} />
         </instancedMesh>
       </group>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, 0]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.08, 0]}>
         <planeGeometry args={[15, 15]} />
         <meshBasicMaterial map={glow} color="#ffc6e0" transparent opacity={0.4} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>

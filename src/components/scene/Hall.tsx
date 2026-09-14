@@ -3,42 +3,92 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { fx, smoothstep } from './fx'
 import { HALL, TABLE_Z } from './layout'
-import { brickTexture, herringboneTexture, mossTexture, planksTexture } from './textures'
+import {
+  brickTexture,
+  carvedScreenTexture,
+  concreteTexture,
+  coveGlowTexture,
+  herringboneTexture,
+  mossTexture,
+  planksTexture,
+  slatsTexture,
+} from './textures'
 import { buildWord, useEmblem } from './LoftSign'
 import { DJBooth } from './DJBooth'
 import { Instances, mat, seeded } from './instancing'
 
 /**
  * Закрытый зал Loft Park по фотографиям гостей:
- * - тёмный потолок-«короб» с зелёной светодиодной подсветкой по периметру;
- * - во всю заднюю стену — живой мох с серебристыми объёмными буквами
- *   LOFT [лист] PARK, ниже — деревянные панели;
- * - серые мягкие диваны вдоль стен, столы «ёлочкой», бирюзовые и пудровые
- *   бархатные кресла;
- * - люстры: чугунные кольца со свечами, зелёные стеклянные шары, деревянные
- *   «барабаны»;
- * - чёрные металлические стеллажи с зелёными бутылками и растениями;
- * - барная стойка с кирпичным фасадом и подсвеченными полками;
+ * - потолок-короб: тёмно-зелёная середина, опущенный край из серой
+ *   штукатурки, по его кромке — светодиодная лента с жёлто-зелёной засветкой;
+ * - задняя стена — живой мох с серебристыми буквами LOFT [лист] PARK,
+ *   под ним грубые деревянные панели, над буквами трек со спотами и
+ *   чугунная люстра-клетка с лампами Эдисона;
+ * - вдоль стен — окна с длинными шторами и кирпичные колонны; под окнами
+ *   бежевые диваны с узорными подушками, столы «ёлочкой» на чёрных ножках,
+ *   бирюзовые и пудровые кресла-«ракушки» на тонких ножках;
+ * - светильники: деревянные «барабаны» из реек, стеклянные шары — янтарные
+ *   и зелёные, у бара — люстра из янтарных «лепестков»;
+ * - стеллажи до потолка с зелёными бутылками, книгами, зеленью и плющом;
+ * - резная деревянная ширма у входа, бар с кирпичным фасадом, подсвеченными
+ *   полками и рыжими кожаными стульями;
  * - к террасе — стекло в чёрных рамах и тяжёлые красные шторы.
  * Сверху на крыше — маяк для финального вида-карты.
  */
 
 const steel = new THREE.MeshStandardMaterial({ color: '#141416', metalness: 0.5, roughness: 0.5 })
 
-/** Одна «штора» со складками: плоскость, смещённая синусом */
-function useCurtainGeometry(w: number, h: number) {
-  return useMemo(() => {
-    const g = new THREE.PlaneGeometry(w, h, 32, 1)
-    const pos = g.attributes.position
-    for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin((pos.getX(i) / w) * Math.PI * 14) * 0.06)
-    g.computeVertexNormals()
-    return g
-  }, [w, h])
+/** Мягкий диван: цоколь, сиденье, спинка, подлокотники. Спинка — у локального −z */
+function sofaGeometry(w: number) {
+  return mergeGeometries([
+    new THREE.BoxGeometry(w, 0.3, 0.86).translate(0, 0.15, 0),
+    new THREE.BoxGeometry(w - 0.36, 0.16, 0.64).translate(0, 0.38, 0.07),
+    new THREE.BoxGeometry(w, 0.64, 0.24).translate(0, 0.62, -0.31),
+    new THREE.BoxGeometry(0.18, 0.52, 0.86).translate(-w / 2 + 0.09, 0.46, 0),
+    new THREE.BoxGeometry(0.18, 0.52, 0.86).translate(w / 2 - 0.09, 0.46, 0),
+  ])!
 }
 
-const COVE = 0.9
+/** Кресло-«ракушка»: чаша-спинка проёмом к +z и круглое сиденье */
+function armchairGeometry() {
+  return mergeGeometries([
+    new THREE.CylinderGeometry(0.33, 0.27, 0.42, 20, 1, true, Math.PI * 0.35, Math.PI * 1.3).translate(0, 0.7, -0.02),
+    new THREE.CylinderGeometry(0.29, 0.27, 0.13, 20).translate(0, 0.49, 0.02),
+  ])!
+}
+
+/** Четыре тонкие ножки, чуть разведённые наружу */
+function chairLegsGeometry() {
+  return mergeGeometries(
+    [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ].map(([sx, sz]) => new THREE.CylinderGeometry(0.014, 0.011, 0.46, 5).rotateZ(-sx * 0.14).rotateX(sz * 0.14).translate(sx * 0.19, 0.22, sz * 0.19)),
+  )!
+}
+
+/** Штора со складками */
+function curtainGeometry(w: number, h: number, folds = 10) {
+  const g = new THREE.PlaneGeometry(w, h, 28, 1)
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin((pos.getX(i) / w) * Math.PI * folds) * 0.05)
+  g.computeVertexNormals()
+  return g
+}
+
+/** Смещение в локальных координатах предмета, повёрнутого на θ вокруг Y */
+const place = (x: number, z: number, theta: number, lx: number, ly: number, lz: number): [number, number, number] => [
+  x + lx * Math.cos(theta) + lz * Math.sin(theta),
+  ly,
+  z - lx * Math.sin(theta) + lz * Math.cos(theta),
+]
+
+const COVE = 1
 
 export function Hall() {
   const H = HALL
@@ -47,7 +97,6 @@ export function Hall() {
   const width = H.x1 - H.x0
   const beacon = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
-  const curtain = useCurtainGeometry(1.6, H.h - 0.1)
 
   const tex = useMemo(() => {
     const herring = herringboneTexture()
@@ -55,14 +104,22 @@ export function Hall() {
     longHerring.wrapS = longHerring.wrapT = THREE.RepeatWrapping
     longHerring.repeat.set(9, 1.4)
     longHerring.needsUpdate = true
+    // вертикальные рейки «барабанов»: горизонтальная текстура, повёрнутая на 90°
+    const drum = slatsTexture([10, 1], true)
+    drum.center.set(0.5, 0.5)
+    drum.rotation = Math.PI / 2
     return {
-      floor: planksTexture([6, 4], true),
+      floor: planksTexture([5, 7], true),
       wall: planksTexture([5, 1.4], false),
-      wainscot: planksTexture([8, 1], false),
+      wainscot: planksTexture([10, 1.2], false),
       moss: mossTexture([7, 0.9]),
-      brick: brickTexture([3, 0.7]),
+      brick: brickTexture([0.5, 2.4]),
+      plaster: concreteTexture(),
+      cove: coveGlowTexture(),
+      screen: carvedScreenTexture(),
       herring,
       longHerring,
+      drum,
     }
   }, [])
 
@@ -70,157 +127,181 @@ export function Hall() {
   const parkWord = useMemo(() => buildWord('PARK', 0.62, 0.135, 0.08, 0.04), [])
   const emblem = useEmblem(0.8, 0.44)
 
-  const mats = useMemo(
-    () => ({
-      silver: new THREE.MeshStandardMaterial({ color: '#e8e6e0', metalness: 0.45, roughness: 0.35, emissive: '#4a4a46', emissiveIntensity: 0.9 }),
-      fabric: new THREE.MeshStandardMaterial({ color: '#7d7874', roughness: 1 }),
-      velvet: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }),
-      tableTop: new THREE.MeshStandardMaterial({ map: tex.herring, roughness: 0.5 }),
-      darkWood: new THREE.MeshStandardMaterial({ color: '#3a2618', roughness: 0.7 }),
-      wire: new THREE.MeshBasicMaterial({ color: '#111' }),
-      bulb: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.6, 1.5), toneMapped: false }),
-      candle: new THREE.MeshStandardMaterial({ color: '#efe6d6', roughness: 0.6 }),
-      bottle: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 }),
-      leaf: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true }),
-      green: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.22, 1.5, 0.36), toneMapped: false }),
-      soffit: new THREE.MeshStandardMaterial({ color: '#1b1e1c', roughness: 0.9 }),
-      leather: new THREE.MeshStandardMaterial({ color: '#b07a45', roughness: 0.5 }),
-      shelfGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2, 0.9), toneMapped: false }),
-    }),
-    [tex],
-  )
-
   const geos = useMemo(
     () => ({
       box: new THREE.BoxGeometry(1, 1, 1),
       cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
-      ring: new THREE.TorusGeometry(0.42, 0.022, 6, 32),
-      bulb: new THREE.SphereGeometry(1, 10, 8),
+      ball: new THREE.SphereGeometry(1, 14, 10),
       leaf: new THREE.IcosahedronGeometry(1, 0),
-      // кресло-«ракушка»: чаша-спинка из части сферы, проём смотрит в +z
-      shell: new THREE.SphereGeometry(0.34, 16, 10, -Math.PI * 0.75, Math.PI * 1.5, Math.PI * 0.3, Math.PI * 0.35).rotateY(-Math.PI / 2),
+      sofa: sofaGeometry(2.3),
+      longSofa: sofaGeometry(4.2),
+      armchair: armchairGeometry(),
+      legs: chairLegsGeometry(),
+      // стол на двух наклонных опорах-трапециях
+      tableLegs: mergeGeometries([-1, 1].map((s) => new THREE.BoxGeometry(0.05, 0.72, 0.55).translate(s * 0.42, 0.36, 0)))!,
+      window: curtainGeometry(0.9, 3.1),
+      frontCurtain: curtainGeometry(1.6, H.h - 0.1, 14),
     }),
-    [],
+    [H.h],
   )
 
-  // ── мягкая мебель ──
-  const seating = useMemo(() => {
-    const palette = ['#1f5f5a', '#1f5f5a', '#d9b1a8', '#2a6e66'].map((c) => new THREE.Color(c))
+  const mats = useMemo(
+    () => ({
+      silver: new THREE.MeshStandardMaterial({ color: '#e8e6e0', metalness: 0.45, roughness: 0.35, emissive: '#4a4a46', emissiveIntensity: 0.9 }),
+      fabric: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }),
+      velvet: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, side: THREE.DoubleSide }),
+      tableTop: new THREE.MeshStandardMaterial({ map: tex.herring, roughness: 0.5 }),
+      darkWood: new THREE.MeshStandardMaterial({ color: '#3a2618', roughness: 0.7 }),
+      wire: new THREE.MeshBasicMaterial({ color: '#111' }),
+      bulb: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.6, 1.5), toneMapped: false }),
+      bottle: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 }),
+      leaf: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true }),
+      plain: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 }),
+      cove: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.1, 1.7, 0.45), toneMapped: false }),
+      soffit: new THREE.MeshStandardMaterial({ map: tex.plaster, color: '#8d8b86', roughness: 0.9 }),
+      leather: new THREE.MeshStandardMaterial({ color: '#b8672c', roughness: 0.45 }),
+      shelfGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2, 0.9), toneMapped: false }),
+      drum: new THREE.MeshStandardMaterial({ map: tex.drum, color: '#d59a5c', alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.6 }),
+      drumGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.55, 0.7), toneMapped: false }),
+      amber: new THREE.MeshStandardMaterial({ color: '#d99a3a', emissive: '#a05a10', emissiveIntensity: 1.3, roughness: 0.1, transparent: true, opacity: 0.6, depthWrite: false }),
+      greenGlass: new THREE.MeshStandardMaterial({ color: '#7ab86a', emissive: '#2f7a2a', emissiveIntensity: 1.1, roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false }),
+      curtain: new THREE.MeshStandardMaterial({ color: '#c08a58', roughness: 0.9, side: THREE.DoubleSide }),
+      night: new THREE.MeshBasicMaterial({ color: '#0f1a24' }),
+    }),
+    [tex],
+  )
+
+  // ── мягкая мебель, столы, кресла ──
+  const furniture = useMemo(() => {
     const out = {
-      booths: [] as THREE.Matrix4[],
-      backs: [] as THREE.Matrix4[],
-      tables: [] as THREE.Matrix4[],
-      legs: [] as THREE.Matrix4[],
-      seats: [] as THREE.Matrix4[],
-      shells: [] as THREE.Matrix4[],
+      sofas: [] as THREE.Matrix4[],
+      sofaColors: [] as THREE.Color[],
+      longSofas: [] as THREE.Matrix4[],
+      pillows: [] as THREE.Matrix4[],
+      pillowColors: [] as THREE.Color[],
+      tops: [] as THREE.Matrix4[],
+      tableLegs: [] as THREE.Matrix4[],
+      chairs: [] as THREE.Matrix4[],
       chairColors: [] as THREE.Color[],
+      chairLegs: [] as THREE.Matrix4[],
     }
-    const chair = (x: number, z: number, ry: number, k: number) => {
-      out.seats.push(mat([x, 0.44, z], [0.28, 0.1, 0.28], ry))
-      out.shells.push(mat([x, 0.5, z], [1, 1, 1], ry))
-      out.legs.push(mat([x, 0.2, z], [0.025, 0.4, 0.025]))
-      out.chairColors.push(palette[k % palette.length])
-    }
-    const rows: [number, number[]][] = [
-      [H.x0 + 0.6, [-89, -94, -99]],
-      // справа у дальней стены — бар
-      [H.x1 - 0.6, [-89, -94]],
-    ]
+    const beige = new THREE.Color('#b3a292')
+    const taupe = new THREE.Color('#9b8f86')
+    const pillowPalette = ['#d69aa2', '#e8dccb', '#3f7d78', '#c9785a'].map((c) => new THREE.Color(c))
+    const chairPalette = ['#1f5f5a', '#d9b1a8', '#1f5f5a', '#b8ab9c'].map((c) => new THREE.Color(c))
     let k = 0
-    for (const [x, zs] of rows) {
-      const inward = x < 0 ? 1 : -1
-      for (const z of zs) {
-        const ry = x < 0 ? Math.PI / 2 : -Math.PI / 2
-        out.booths.push(mat([x, 0.26, z], [0.8, 0.52, 2.4]))
-        out.backs.push(mat([x - inward * 0.34, 0.78, z], [0.2, 0.62, 2.4]))
-        out.tables.push(mat([x + inward * 1.15, 0.74, z], [1.1, 0.05, 1.1]))
-        out.legs.push(mat([x + inward * 1.15, 0.37, z], [0.05, 0.74, 0.05]))
-        chair(x + inward * 2.05, z - 0.35, ry + Math.PI, k++)
-        chair(x + inward * 2.05, z + 0.35, ry + Math.PI, k++)
-      }
+    const chair = (x: number, z: number, theta: number) => {
+      out.chairs.push(mat([x, 0, z], [1, 1, 1], theta))
+      out.chairLegs.push(mat([x, 0, z], [1, 1, 1], theta))
+      out.chairColors.push(chairPalette[k++ % chairPalette.length])
     }
-    // кресла у общего стола — лицом к камере на блюдах
-    for (const x of [-4.8, -2.4, 0, 2.4, 4.8]) chair(x, TABLE_Z - 1.05, 0, k++)
-    return out
-  }, [H.x0, H.x1])
+    const pillows = (x: number, z: number, theta: number, offsets: number[]) =>
+      offsets.forEach((lx, i) => {
+        out.pillows.push(mat(place(x, z, theta, lx, 0.66, -0.12), [0.42, 0.38, 0.12], theta + (i % 2 ? 0.12 : -0.1), -0.25))
+        out.pillowColors.push(pillowPalette[(k + i) % pillowPalette.length])
+      })
+    const table = (x: number, z: number, theta: number) => {
+      out.tops.push(mat([x, 0.75, z], [1.2, 0.05, 0.8], theta))
+      out.tableLegs.push(mat([x, 0, z], [1, 1, 1], theta))
+    }
 
-  // ── свет: люстры-кольца, зелёные шары, деревянные барабаны ──
-  const lamps = useMemo(() => {
-    const out = { rings: [] as THREE.Matrix4[], candles: [] as THREE.Matrix4[], bulbs: [] as THREE.Matrix4[], wires: [] as THREE.Matrix4[] }
-    const wire = (x: number, z: number, y: number) => {
-      const len = H.h - 0.3 - y
-      out.wires.push(mat([x, y + len / 2, z], [0.008, len, 0.008]))
-    }
+    // диваны под окнами: спинкой к стене, стол и два кресла напротив
     for (const [x, z] of [
-      [H.x0 + 1.75, -89],
-      [H.x0 + 1.75, -94],
-      [H.x0 + 1.75, -99],
-      [H.x1 - 1.75, -89],
-      [H.x1 - 1.75, -94],
+      [H.x0 + 0.5, -89],
+      [H.x0 + 0.5, -94],
+      [H.x1 - 0.5, -89],
+      [H.x1 - 0.5, -93.5],
     ]) {
-      const y = 2.75
-      out.rings.push(mat([x, y, z], [1, 1, 1], 0, Math.PI / 2))
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2
-        const cx = x + Math.cos(a) * 0.42
-        const czz = z + Math.sin(a) * 0.42
-        out.candles.push(mat([cx, y + 0.08, czz], [0.03, 0.14, 0.03]))
-        out.bulbs.push(mat([cx, y + 0.2, czz], [0.045, 0.06, 0.045]))
-      }
-      // четыре цепи к кольцу сходятся в одну
-      wire(x, z, y + 0.5)
+      const left = x < 0
+      const theta = left ? Math.PI / 2 : -Math.PI / 2
+      out.sofas.push(mat([x, 0, z], [1, 1, 1], theta))
+      out.sofaColors.push(left ? beige : taupe)
+      pillows(x, z, theta, [-0.7, 0.65])
+      const tx = x + (left ? 1.25 : -1.25)
+      table(tx, z, theta)
+      chair(tx + (left ? 0.95 : -0.95), z - 0.36, left ? -Math.PI / 2 : Math.PI / 2)
+      chair(tx + (left ? 0.95 : -0.95), z + 0.36, left ? -Math.PI / 2 : Math.PI / 2)
     }
+    // длинный серый диван у стены из мха, слева от DJ
+    const bx = -9.5
+    const bz = H.zBack + 0.55
+    out.longSofas.push(mat([bx, 0, bz], [1, 1, 1], 0))
+    pillows(bx, bz, 0, [-1.4, -0.3, 1.2])
+    table(bx - 0.7, bz + 1.2, 0)
+    table(bx + 1.0, bz + 1.2, 0)
+    chair(bx - 0.9, bz + 2.15, Math.PI)
+    chair(bx + 1.2, bz + 2.15, Math.PI)
+    // кресла у общего стола — лицом к камере на блюдах
+    for (const x of [-4.8, -2.4, 0, 2.4, 4.8]) chair(x, TABLE_Z - 1.05, 0)
     return out
-  }, [H.h, H.x0, H.x1])
+  }, [H.x0, H.x1, H.zBack])
 
-  // Светильники висят в ≥ 1 м от пролётов камеры 6 → 7 и 7 → 8 (keyframes.ts)
-  const globes: [number, number][] = [
-    [-1.8, TABLE_Z],
-    [1.8, TABLE_Z],
-    [-5.6, -90.9],
-    [5.6, -90.9],
-  ]
-  const drums: [number, number][] = [
-    [0, -87.2],
-    [-6.2, -96],
-  ]
-
-  // ── стеллажи с бутылками и зеленью ──
+  // ── стеллажи до потолка: бутылки, книги, зелень, плющ ──
   const shelving = useMemo(() => {
     const r = seeded(19)
-    const out = { frames: [] as THREE.Matrix4[], boards: [] as THREE.Matrix4[], bottles: [] as THREE.Matrix4[], bottleColors: [] as THREE.Color[], leaves: [] as THREE.Matrix4[], leafColors: [] as THREE.Color[] }
-    const bottlePalette = ['#1f7a3c', '#2a8a47', '#175c2e', '#b86a2a', '#d9cfb8'].map((c) => new THREE.Color(c))
-    // тёмная зелень: в тёплом свете зала светлые оттенки уходили в жёлтый
+    const out = {
+      frames: [] as THREE.Matrix4[],
+      boards: [] as THREE.Matrix4[],
+      bottles: [] as THREE.Matrix4[],
+      bottleColors: [] as THREE.Color[],
+      books: [] as THREE.Matrix4[],
+      bookColors: [] as THREE.Color[],
+      leaves: [] as THREE.Matrix4[],
+      leafColors: [] as THREE.Color[],
+    }
+    const green = ['#1f7a3c', '#2a8a47', '#175c2e'].map((c) => new THREE.Color(c))
+    const bar = ['#b86a2a', '#d9cfb8', '#6b2a1a', '#1f7a3c', '#c9a032'].map((c) => new THREE.Color(c))
+    const bookPalette = ['#7a2e22', '#2f4a5e', '#c9a46a', '#3b5a3a', '#e3dccd', '#1d1d1f'].map((c) => new THREE.Color(c))
     const leafPalette = ['#2c5a28', '#3b6b32', '#234822', '#46743a'].map((c) => new THREE.Color(c))
-    const unit = (cx: number, cz: number, w: number, d: number, alongZ: boolean, levels: number[], bottlesOnly = false) => {
+    const leaf = (x: number, y: number, z: number, s: number) => {
+      out.leaves.push(mat([x, y, z], [s, s, s], r() * 3, r() * 3))
+      out.leafColors.push(leafPalette[Math.floor(r() * leafPalette.length)])
+    }
+    const unit = (cx: number, cz: number, w: number, d: number, alongZ: boolean, levels: number[], barShelf = false) => {
       const px = alongZ ? d / 2 : w / 2
       const pz = alongZ ? w / 2 : d / 2
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) out.frames.push(mat([cx + sx * px, 1.25, cz + sz * pz], [0.04, 2.5, 0.04]))
+      const top = levels[levels.length - 1] + 0.1
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) out.frames.push(mat([cx + sx * px, top / 2, cz + sz * pz], [0.04, top, 0.04]))
       levels.forEach((y, li) => {
         out.boards.push(mat([cx, y, cz], alongZ ? [d, 0.03, w] : [w, 0.03, d]))
-        const count = Math.round(w / 0.16)
-        for (let i = 0; i < count; i++) {
-          const t = (i + 0.5) / count - 0.5
-          const [x, z] = alongZ ? [cx + (r() - 0.5) * d * 0.4, cz + t * w] : [cx + t * w, cz + (r() - 0.5) * d * 0.4]
-          if (bottlesOnly || (li + i) % 3 !== 0) {
-            const h = 0.26 + r() * 0.12
-            out.bottles.push(mat([x, y + h / 2 + 0.02, z], [0.04, h, 0.04]))
-            out.bottleColors.push(bottlePalette[Math.floor(r() * (bottlesOnly ? 5 : 3))])
+        let t = -w / 2 + 0.08
+        while (t < w / 2 - 0.1) {
+          const along = (v: number) => (alongZ ? [cx + (r() - 0.5) * d * 0.3, cz + v] : [cx + v, cz + (r() - 0.5) * d * 0.3])
+          const kind = barShelf ? 0 : Math.floor(r() * 4)
+          if (kind === 0 || kind === 1) {
+            // ряд бутылок
+            const n = 2 + Math.floor(r() * 4)
+            for (let i = 0; i < n && t < w / 2 - 0.1; i++, t += 0.1) {
+              const [x, z] = along(t)
+              const h = 0.24 + r() * 0.14
+              out.bottles.push(mat([x, y + h / 2 + 0.02, z], [0.035, h, 0.035]))
+              out.bottleColors.push(barShelf ? bar[Math.floor(r() * bar.length)] : green[Math.floor(r() * green.length)])
+            }
+          } else if (kind === 2) {
+            // стопка книг корешками наружу
+            const n = 3 + Math.floor(r() * 5)
+            for (let i = 0; i < n && t < w / 2 - 0.1; i++, t += 0.045) {
+              const [x, z] = along(t)
+              const h = 0.2 + r() * 0.1
+              out.books.push(mat([x, y + h / 2 + 0.02, z], alongZ ? [0.18, h, 0.04] : [0.04, h, 0.18]))
+              out.bookColors.push(bookPalette[Math.floor(r() * bookPalette.length)])
+            }
           } else {
-            const s = 0.14 + r() * 0.1
-            out.leaves.push(mat([x, y + s, z], [s, s, s], r() * 3))
-            out.leafColors.push(leafPalette[Math.floor(r() * leafPalette.length)])
-            // плети свисают с полки
-            out.leaves.push(mat([x + (r() - 0.5) * 0.1, y - 0.18, z], [0.07, 0.16, 0.07], r() * 3))
-            out.leafColors.push(leafPalette[Math.floor(r() * leafPalette.length)])
+            // горшок с зеленью и плети плюща
+            const [x, z] = along(t)
+            leaf(x, y + 0.16, z, 0.16 + r() * 0.08)
+            if (li > 0) for (let s = 0; s < 4; s++) leaf(x + (r() - 0.5) * 0.12, y - 0.1 - s * 0.14, z + (r() - 0.5) * 0.12, 0.06)
+            t += 0.3
           }
+          t += 0.06
         }
       })
     }
-    unit(-4.6, -97.8, 2.4, 0.36, false, [0.12, 0.7, 1.28, 1.86, 2.44])
-    unit(4.6, -97.8, 2.4, 0.36, false, [0.12, 0.7, 1.28, 1.86, 2.44])
-    // полки за барной стойкой
-    unit(H.x1 - 0.25, -98.4, 5.2, 0.3, true, [1.45, 1.95, 2.45], true)
+    // перегородки по сторонам от DJ — до опущенного края потолка
+    unit(-4.6, -97.8, 2.4, 0.36, false, [0.12, 0.68, 1.24, 1.8, 2.36, 2.92, 3.4])
+    unit(4.6, -97.8, 2.4, 0.36, false, [0.12, 0.68, 1.24, 1.8, 2.36, 2.92, 3.4])
+    // за барной стойкой
+    unit(H.x1 - 0.25, -98.4, 5.2, 0.3, true, [1.45, 1.95, 2.45, 2.95], true)
     return out
   }, [H.x1])
 
@@ -237,31 +318,60 @@ export function Hall() {
     }
   })
 
-  const sideWall = (x: number) => (
-    <mesh position={[x, H.h / 2, cz]} rotation-y={x < 0 ? Math.PI / 2 : -Math.PI / 2}>
-      <planeGeometry args={[depth, H.h]} />
-      <meshStandardMaterial map={tex.wall} color="#8a6a50" roughness={0.8} side={THREE.DoubleSide} />
-    </mesh>
-  )
-
   // Буквы на мху: LOFT, лист, PARK — по центру над DJ-пультом
   const EMB_W = 0.44
   const GAP = 0.2
   const signW = loftWord.width + GAP + EMB_W + GAP + parkWord.width
   const signX = -signW / 2
   const SIGN_Y = 2.2
+  const SOFFIT_Y = H.h - 0.3
+
+  // Окна по боковым стенам — над диванами; между ними кирпичные колонны
+  const windows: [number, number][] = [
+    [H.x0, -89],
+    [H.x0, -94],
+    [H.x1, -89],
+    [H.x1, -93.5],
+  ]
+  const pillars: [number, number][] = [
+    [H.x0, -91.5],
+    [H.x0, -96.6],
+    [H.x1, -91.25],
+    [H.x1, -95.35],
+  ]
+
+  // Светильники висят в ≥ 1 м от пролётов камеры 6 → 7 и 7 → 8 (keyframes.ts)
+  const drums: [number, number][] = [
+    [0, -87.2],
+    [H.x1 - 1.75, -89],
+    [H.x1 - 1.75, -93.5],
+  ]
+  const globes: [number, number, number, boolean][] = [
+    [-1.8, 2.72, TABLE_Z, true],
+    [1.8, 2.72, TABLE_Z, false],
+    [H.x0 + 1.55, 2.6, -88.6, true],
+    [H.x0 + 1.95, 2.85, -89.3, false],
+    [H.x0 + 1.55, 2.6, -93.6, false],
+    [H.x0 + 1.95, 2.85, -94.3, true],
+    [-8.8, 2.7, -100.4, true],
+    [-10.2, 2.9, -100.1, false],
+  ]
 
   return (
     <group>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, cz]}>
         <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial map={tex.floor} color="#b5a898" roughness={0.6} />
+        <meshStandardMaterial map={tex.floor} color="#a39180" roughness={0.55} />
       </mesh>
 
-      {/* потолок-короб: тёмная середина, опущенный край, зелёная подсветка */}
+      {/* потолок: тёмно-зелёный короб, серый опущенный край, LED-лента и засветка */}
       <mesh rotation-x={Math.PI / 2} position={[0, H.h, cz]}>
         <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial color="#232826" roughness={0.9} />
+        <meshStandardMaterial color="#1d2a22" roughness={0.9} />
+      </mesh>
+      <mesh rotation-x={Math.PI / 2} position={[0, H.h - 0.01, cz]}>
+        <planeGeometry args={[width - COVE * 2, depth - COVE * 2]} />
+        <meshBasicMaterial map={tex.cove} transparent opacity={0.4} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh position={[0, H.h + 0.18, cz]}>
         <boxGeometry args={[width + 0.6, 0.34, depth + 0.6]} />
@@ -273,23 +383,56 @@ export function Hall() {
         [H.x0 + COVE / 2, cz, COVE, depth - COVE * 2],
         [H.x1 - COVE / 2, cz, COVE, depth - COVE * 2],
       ].map(([x, z, w, d]) => (
-        <mesh key={`${x}${z}`} position={[x, H.h - 0.14, z]} material={mats.soffit}>
-          <boxGeometry args={[w, 0.28, d]} />
+        <mesh key={`${x}${z}`} position={[x, SOFFIT_Y + 0.15, z]} material={mats.soffit}>
+          <boxGeometry args={[w, 0.3, d]} />
         </mesh>
       ))}
       {[
-        [0, H.zFront - COVE, width - COVE * 2, 0.04],
-        [0, H.zBack + COVE, width - COVE * 2, 0.04],
-        [H.x0 + COVE, cz, 0.04, depth - COVE * 2],
-        [H.x1 - COVE, cz, 0.04, depth - COVE * 2],
+        [0, H.zFront - COVE - 0.02, width - COVE * 2, 0.04],
+        [0, H.zBack + COVE + 0.02, width - COVE * 2, 0.04],
+        [H.x0 + COVE + 0.02, cz, 0.04, depth - COVE * 2],
+        [H.x1 - COVE - 0.02, cz, 0.04, depth - COVE * 2],
       ].map(([x, z, w, d]) => (
-        <mesh key={`${x}${z}`} position={[x, H.h - 0.26, z]} material={mats.green}>
+        <mesh key={`${x}${z}`} position={[x, SOFFIT_Y + 0.33, z]} material={mats.cove}>
           <boxGeometry args={[w, 0.03, d]} />
         </mesh>
       ))}
 
-      {sideWall(H.x0)}
-      {sideWall(H.x1)}
+      {/* боковые стены: деревянная обшивка, окна со шторами, кирпичные колонны */}
+      {[H.x0, H.x1].map((x) => (
+        <mesh key={x} position={[x, H.h / 2, cz]} rotation-y={x < 0 ? Math.PI / 2 : -Math.PI / 2}>
+          <planeGeometry args={[depth, H.h]} />
+          <meshStandardMaterial map={tex.wall} color="#9a7556" roughness={0.8} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      {windows.map(([wx, wz]) => {
+        const inward = wx < 0 ? 1 : -1
+        const ry = wx < 0 ? Math.PI / 2 : -Math.PI / 2
+        return (
+          <group key={`${wx}${wz}`}>
+            <mesh position={[wx + inward * 0.03, 2.1, wz]} rotation-y={ry} material={mats.night}>
+              <planeGeometry args={[1.9, 2.3]} />
+            </mesh>
+            {[-1, 1].map((s) => (
+              <mesh key={s} position={[wx + inward * 0.05, 2.1, wz + s * 0.97]} material={steel}>
+                <boxGeometry args={[0.06, 2.4, 0.06]} />
+              </mesh>
+            ))}
+            <mesh position={[wx + inward * 0.05, 1.08, wz]} material={steel}>
+              <boxGeometry args={[0.06, 0.06, 2]} />
+            </mesh>
+            {[-1, 1].map((s) => (
+              <mesh key={s} geometry={geos.window} material={mats.curtain} position={[wx + inward * 0.14, SOFFIT_Y - 1.55, wz + s * 1.2]} rotation-y={ry} />
+            ))}
+          </group>
+        )
+      })}
+      {pillars.map(([px, pz]) => (
+        <mesh key={`${px}${pz}`} position={[px + (px < 0 ? 0.15 : -0.15), H.h / 2, pz]}>
+          <boxGeometry args={[0.3, H.h, 0.5]} />
+          <meshStandardMaterial map={tex.brick} roughness={0.9} />
+        </mesh>
+      ))}
 
       {/* фасад к террасе: стекло в чёрных рамах по краям проёма */}
       {[
@@ -312,18 +455,34 @@ export function Hall() {
       {/* красные шторы вдоль стёкол, за краем проёма: внутри проёма штора
           закрывала треть кадра, когда камера выходит из зала к шатру */}
       {[-H.opening - 0.9, H.opening + 0.9, -10.6, 10.6].map((x) => (
-        <mesh key={x} geometry={curtain} position={[x, H.h / 2, H.zFront - 0.25]}>
+        <mesh key={x} geometry={geos.frontCurtain} position={[x, H.h / 2, H.zFront - 0.25]}>
           <meshStandardMaterial color="#a3161f" roughness={0.8} side={THREE.DoubleSide} />
         </mesh>
       ))}
 
-      {/* задняя стена: деревянные панели внизу, мох во всю ширину */}
+      {/* резная ширма справа от входа */}
+      <group position={[7.4, 0, -88.7]} rotation-y={Math.PI / 2}>
+        <mesh position={[0, 1.25, 0]}>
+          <planeGeometry args={[2.4, 2.3]} />
+          <meshStandardMaterial map={tex.screen} alphaTest={0.4} side={THREE.DoubleSide} roughness={0.7} />
+        </mesh>
+        {[-1.22, 1.22].map((s) => (
+          <mesh key={s} position={[s, 1.25, 0]} material={mats.darkWood}>
+            <boxGeometry args={[0.06, 2.5, 0.08]} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* задняя стена: грубые доски внизу, мох во всю ширину */}
       <mesh position={[0, 0.6, H.zBack + 0.03]}>
         <planeGeometry args={[width, 1.2]} />
-        <meshStandardMaterial map={tex.wainscot} color="#b0835a" roughness={0.7} />
+        <meshStandardMaterial map={tex.wainscot} color="#8c6e56" roughness={0.9} />
       </mesh>
-      <mesh position={[0, 1.2 + (H.h - 1.2 - 0.28) / 2, H.zBack + 0.05]}>
-        <planeGeometry args={[width, H.h - 1.2 - 0.28]} />
+      <mesh position={[0, 1.22, H.zBack + 0.07]} material={mats.darkWood}>
+        <boxGeometry args={[width, 0.05, 0.08]} />
+      </mesh>
+      <mesh position={[0, 1.2 + (SOFFIT_Y - 1.2) / 2, H.zBack + 0.05]}>
+        <planeGeometry args={[width, SOFFIT_Y - 1.2]} />
         <meshStandardMaterial map={tex.moss} roughness={1} />
       </mesh>
       <mesh geometry={loftWord.geo} material={mats.silver} position={[signX, SIGN_Y, H.zBack + 0.06]} />
@@ -332,15 +491,36 @@ export function Hall() {
         <mesh geometry={emblem.rings} material={mats.silver} />
         <mesh geometry={emblem.vein} material={mats.silver} />
       </group>
-      {/* трековые светильники над буквами */}
-      <mesh position={[0, H.h - 0.32, H.zBack + 0.5]} material={steel}>
-        <boxGeometry args={[7, 0.05, 0.05]} />
+      {/* трек со спотами и люстра-клетка над буквами */}
+      <mesh position={[0, SOFFIT_Y - 0.06, H.zBack + COVE + 0.1]} material={steel}>
+        <boxGeometry args={[8, 0.05, 0.05]} />
       </mesh>
-      {[-3, -1.8, -0.6, 0.6, 1.8, 3].map((x) => (
-        <mesh key={x} position={[x, H.h - 0.45, H.zBack + 0.42]} rotation-x={0.6} material={steel}>
-          <cylinderGeometry args={[0.06, 0.05, 0.2, 10]} />
+      {[-3.6, -2.2, 2.2, 3.6].map((x) => (
+        <mesh key={x} position={[x, SOFFIT_Y - 0.2, H.zBack + COVE]} rotation-x={0.7} material={steel}>
+          <cylinderGeometry args={[0.06, 0.05, 0.22, 10]} />
         </mesh>
       ))}
+      <group position={[-2.4, 2.95, H.zBack + 0.75]}>
+        <mesh position={[0, 0.4, 0]} material={mats.wire}>
+          <cylinderGeometry args={[0.01, 0.01, 0.5, 3]} />
+        </mesh>
+        {[0.16, -0.16].map((y) => (
+          <mesh key={y} position-y={y} rotation-x={Math.PI / 2} material={steel}>
+            <torusGeometry args={[0.36, 0.018, 6, 28]} />
+          </mesh>
+        ))}
+        {Array.from({ length: 10 }, (_, i) => {
+          const a = (i / 10) * Math.PI * 2
+          return (
+            <mesh key={i} position={[Math.cos(a) * 0.36, 0, Math.sin(a) * 0.36]} material={steel}>
+              <boxGeometry args={[0.015, 0.34, 0.015]} />
+            </mesh>
+          )
+        })}
+        {[-0.15, 0, 0.15].map((x, i) => (
+          <mesh key={x} position={[x, -0.02 - (i % 2) * 0.05, (i - 1) * 0.08]} scale={[0.045, 0.075, 0.045]} geometry={geos.ball} material={mats.bulb} />
+        ))}
+      </group>
 
       {/* общий стол для трёх блюд */}
       <mesh position={[0, 1.0, TABLE_Z]}>
@@ -353,55 +533,62 @@ export function Hall() {
         </mesh>
       ))}
 
-      <Instances items={seating.booths} geometry={geos.box} material={mats.fabric} />
-      <Instances items={seating.backs} geometry={geos.box} material={mats.fabric} />
-      <Instances items={seating.tables} geometry={geos.box} material={mats.tableTop} />
-      <Instances items={seating.legs} geometry={geos.cyl} material={steel} />
-      <Instances items={seating.seats} geometry={geos.cyl} material={mats.velvet} colors={seating.chairColors} />
-      <Instances items={seating.shells} geometry={geos.shell} material={mats.velvet} colors={seating.chairColors} />
+      <Instances items={furniture.sofas} geometry={geos.sofa} material={mats.fabric} colors={furniture.sofaColors} />
+      <Instances items={furniture.longSofas} geometry={geos.longSofa} material={mats.fabric} colors={[new THREE.Color('#8c8782')]} />
+      <Instances items={furniture.pillows} geometry={geos.box} material={mats.fabric} colors={furniture.pillowColors} />
+      <Instances items={furniture.tops} geometry={geos.box} material={mats.tableTop} />
+      <Instances items={furniture.tableLegs} geometry={geos.tableLegs} material={steel} />
+      <Instances items={furniture.chairs} geometry={geos.armchair} material={mats.velvet} colors={furniture.chairColors} />
+      <Instances items={furniture.chairLegs} geometry={geos.legs} material={steel} />
 
-      {/* люстры-кольца со свечами */}
-      <Instances items={lamps.rings} geometry={geos.ring} material={steel} />
-      <Instances items={lamps.candles} geometry={geos.cyl} material={mats.candle} />
-      <Instances items={lamps.bulbs} geometry={geos.bulb} material={mats.bulb} />
-      <Instances items={lamps.wires} geometry={geos.cyl} material={mats.wire} />
-      {/* зелёные стеклянные шары */}
-      {globes.map(([x, z]) => (
-        <group key={`${x}${z}`} position={[x, 2.72, z]}>
-          <mesh position={[0, (H.h - 0.3 - 2.72) / 2 + 0.2, 0]} material={mats.wire}>
-            <cylinderGeometry args={[0.008, 0.008, H.h - 0.3 - 2.72, 3]} />
-          </mesh>
-          <mesh>
-            <sphereGeometry args={[0.27, 20, 14]} />
-            <meshStandardMaterial color="#6fae62" emissive="#2f7a2a" emissiveIntensity={1.1} roughness={0.1} transparent opacity={0.55} depthWrite={false} />
-          </mesh>
-          <mesh scale={[0.06, 0.09, 0.06]} material={mats.bulb} geometry={geos.bulb} />
-        </group>
-      ))}
-      {/* деревянные «барабаны» */}
+      {/* деревянные «барабаны» из реек */}
       {drums.map(([x, z]) => (
-        <group key={`${x}${z}`} position={[x, 2.9, z]}>
-          <mesh position={[0, 0.35, 0]} material={mats.wire}>
-            <cylinderGeometry args={[0.008, 0.008, 0.5, 3]} />
+        <group key={`${x}${z}`} position={[x, 2.85, z]}>
+          <mesh position={[0, 0.45, 0]} material={mats.wire}>
+            <cylinderGeometry args={[0.008, 0.008, 0.6, 3]} />
           </mesh>
-          <mesh>
-            <cylinderGeometry args={[0.6, 0.6, 0.2, 28, 1, true]} />
-            <meshStandardMaterial color="#9b6a3c" roughness={0.6} side={THREE.DoubleSide} />
+          <mesh material={mats.drum}>
+            <cylinderGeometry args={[0.55, 0.55, 0.32, 36, 1, true]} />
           </mesh>
-          <mesh position={[0, -0.08, 0]} rotation-x={Math.PI / 2}>
-            <circleGeometry args={[0.58, 28]} />
-            <meshBasicMaterial color={[2.6, 1.8, 0.9]} toneMapped={false} side={THREE.DoubleSide} />
+          <mesh material={mats.drumGlow}>
+            <cylinderGeometry args={[0.47, 0.47, 0.26, 24, 1, true]} />
+          </mesh>
+          <mesh position={[0, -0.12, 0]} rotation-x={Math.PI / 2} material={mats.drumGlow}>
+            <circleGeometry args={[0.5, 24]} />
           </mesh>
         </group>
       ))}
+      {/* стеклянные шары: янтарные и зелёные, на разной высоте */}
+      {globes.map(([x, y, z, isAmber]) => (
+        <group key={`${x}${z}`} position={[x, y, z]}>
+          <mesh position={[0, (SOFFIT_Y - y) / 2, 0]} material={mats.wire}>
+            <cylinderGeometry args={[0.007, 0.007, SOFFIT_Y - y, 3]} />
+          </mesh>
+          <mesh scale={0.22} geometry={geos.ball} material={isAmber ? mats.amber : mats.greenGlass} />
+          <mesh scale={[0.04, 0.07, 0.04]} geometry={geos.ball} material={mats.bulb} />
+        </group>
+      ))}
+      {/* люстра из янтарных «лепестков» у бара */}
+      <group position={[8.3, 2.75, -97.6]}>
+        <mesh position={[0, 0.45, 0]} material={mats.wire}>
+          <cylinderGeometry args={[0.008, 0.008, 0.5, 3]} />
+        </mesh>
+        {Array.from({ length: 14 }, (_, i) => {
+          const a = (i / 14) * Math.PI * 2
+          const tier = i % 2
+          return <mesh key={i} position={[Math.cos(a) * (0.3 + tier * 0.08), -tier * 0.14, Math.sin(a) * (0.3 + tier * 0.08)]} rotation={[0, -a, 0.9]} scale={[0.02, 0.2, 0.14]} geometry={geos.ball} material={mats.amber} />
+        })}
+        <mesh scale={[0.06, 0.08, 0.06]} geometry={geos.ball} material={mats.bulb} />
+      </group>
 
       {/* стеллажи */}
       <Instances items={shelving.frames} geometry={geos.box} material={steel} />
       <Instances items={shelving.boards} geometry={geos.box} material={steel} />
       <Instances items={shelving.bottles} geometry={geos.cyl} material={mats.bottle} colors={shelving.bottleColors} />
+      <Instances items={shelving.books} geometry={geos.box} material={mats.plain} colors={shelving.bookColors} />
       <Instances items={shelving.leaves} geometry={geos.leaf} material={mats.leaf} colors={shelving.leafColors} />
 
-      {/* бар: кирпичный фасад, деревянная столешница, подсветка полок, стулья */}
+      {/* бар: кирпичный фасад, столешница, подсветка, рыжие кожаные стулья */}
       <group position={[H.x1 - 1.8, 0, -98.4]}>
         <mesh position={[0, 0.55, 0]}>
           <boxGeometry args={[0.8, 1.1, 5.6]} />
@@ -409,12 +596,12 @@ export function Hall() {
         </mesh>
         <mesh position={[-0.41, 0.55, 0]} rotation-y={-Math.PI / 2}>
           <planeGeometry args={[5.6, 1.1]} />
-          <meshStandardMaterial map={tex.brick} roughness={0.9} />
+          <meshStandardMaterial map={tex.brick} color="#c9b8a8" roughness={0.9} />
         </mesh>
         <mesh position={[-0.05, 1.13, 0]} material={mats.darkWood}>
           <boxGeometry args={[1.05, 0.06, 5.8]} />
         </mesh>
-        <mesh position={[-0.43, 0.08, 0]} material={mats.shelfGlow}>
+        <mesh position={[-0.43, 1.06, 0]} material={mats.shelfGlow}>
           <boxGeometry args={[0.02, 0.02, 5.6]} />
         </mesh>
         {[-2, -0.7, 0.6, 1.9].map((z) => (
@@ -422,41 +609,44 @@ export function Hall() {
             <mesh position={[0, 0.38, 0]} material={steel}>
               <cylinderGeometry args={[0.025, 0.04, 0.76, 6]} />
             </mesh>
-            <mesh position={[0, 0.78, 0]} material={mats.leather}>
-              <cylinderGeometry args={[0.2, 0.18, 0.08, 14]} />
+            <mesh position={[0, 0.8, 0]} material={mats.leather}>
+              <boxGeometry args={[0.42, 0.08, 0.42]} />
+            </mesh>
+            <mesh position={[-0.2, 1.08, 0]} rotation-z={0.15} material={mats.leather}>
+              <boxGeometry args={[0.06, 0.5, 0.4]} />
             </mesh>
           </group>
         ))}
       </group>
-      {[1.44, 1.94, 2.44].map((y) => (
+      {[1.44, 1.94, 2.44, 2.94].map((y) => (
         <mesh key={y} position={[H.x1 - 0.12, y - 0.03, -98.4]} material={mats.shelfGlow}>
           <boxGeometry args={[0.02, 0.02, 5.2]} />
         </mesh>
       ))}
 
-      {/* растения в кадках по углам */}
+      {/* высокие кашпо с зеленью у входа и в углу */}
       {[
         [H.x0 + 0.8, H.zFront - 0.9],
         [H.x1 - 0.8, H.zFront - 0.9],
-        [H.x0 + 0.8, H.zBack + 0.9],
+        [-6.4, H.zBack + 0.7],
       ].map(([x, z]) => (
         <group key={`${x}${z}`} position={[x, 0, z]}>
-          <mesh position={[0, 0.35, 0]}>
-            <cylinderGeometry args={[0.35, 0.3, 0.7, 12]} />
-            <meshStandardMaterial color="#2a2522" roughness={0.8} />
+          <mesh position={[0, 0.45, 0]}>
+            <boxGeometry args={[0.7, 0.9, 0.7]} />
+            <meshStandardMaterial color="#26282a" roughness={0.8} />
           </mesh>
-          {[0, 1, 2, 3].map((k) => (
-            <mesh key={k} position={[Math.cos(k * 1.7) * 0.3, 1.1 + k * 0.35, Math.sin(k * 1.7) * 0.3]} scale={[0.55, 0.6, 0.55]}>
+          {[0, 1, 2, 3, 4].map((k) => (
+            <mesh key={k} position={[Math.cos(k * 1.7) * 0.25, 1.15 + k * 0.28, Math.sin(k * 1.7) * 0.25]} scale={[0.45, 0.42, 0.45]}>
               <icosahedronGeometry args={[1, 1]} />
-              <meshStandardMaterial color={k % 2 ? '#2f6a33' : '#3f7c3c'} roughness={1} />
+              <meshStandardMaterial color={k % 2 ? '#2f6a33' : '#3f7c3c'} roughness={1} flatShading />
             </mesh>
           ))}
         </group>
       ))}
 
       <pointLight position={[0, 2.9, TABLE_Z + 0.5]} color="#ffb870" intensity={16} distance={10} decay={1.4} />
-      <pointLight position={[-6, 2.8, -96]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
-      <pointLight position={[8.4, 2.6, -97.5]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
+      <pointLight position={[-7.5, 2.7, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
+      <pointLight position={[8.4, 2.6, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
 
       <DJBooth />
 

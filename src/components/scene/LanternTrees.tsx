@@ -35,17 +35,18 @@ const fairyVertex = /* glsl */ `
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = 34.0 * uPixelRatio / -mv.z;
+    gl_PointSize = 34.0 * uPixelRatio / max(-mv.z, 0.2);
     vA = 0.6 + 0.4 * sin(uTime * 2.3 + aPhase * 50.0);
   }
 `
 const fairyFragment = /* glsl */ `
   varying float vA;
   void main() {
-    float d = distance(gl_PointCoord, vec2(0.5));
-    float g = 0.06 / d - 0.12;
+    // защита от деления на ноль: иначе NaN → чёрные квадраты в bloom (см. Fireflies)
+    float d = max(distance(gl_PointCoord, vec2(0.5)), 0.02);
+    float g = min(0.06 / d - 0.12, 2.0);
     if (g <= 0.0) discard;
-    gl_FragColor = vec4(vec3(2.6, 2.0, 1.15), g * vA);
+    gl_FragColor = vec4(vec3(2.6, 2.0, 1.15), clamp(g * vA, 0.0, 1.0));
   }
 `
 

@@ -64,14 +64,18 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
     <Canvas
       dpr={dpr}
       gl={{ antialias: false, powerPreference: 'high-performance', stencil: false }}
-      camera={{ fov: 55, near: 0.1, far: 420, position: [0, 2.1, 12] }}
+      // near 0.25, а не 0.1: точность глубины вдали вырастает вдвое с лишним,
+      // плоскости плитки и световых пятен у земли перестают мерцать
+      camera={{ fov: 55, near: 0.25, far: 420, position: [0, 2.2, 16] }}
       onCreated={(state) => {
         if (flags.debug) (window as unknown as { __loft: unknown }).__loft = { state, fx }
       }}
     >
       <color attach="background" args={['#07090d']} />
       <fogExp2 attach="fog" args={['#0b1016', 0.035]} />
-      <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(quality === 'high' ? 1.75 : 1.25)} />
+      {/* Только вниз и один раз: смена dpr пересоздаёт буфер холста, и каждое
+          «снизить — вернуть» было видно как моргание всей сцены */}
+      <PerformanceMonitor flipflops={1} onDecline={() => setDpr(1)} onFallback={() => setDpr(1)} />
 
       <hemisphereLight args={['#4a6194', '#140d08', 0.95]} />
       <ambientLight intensity={0.2} color="#ffdcb0" />

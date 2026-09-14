@@ -244,7 +244,7 @@ export function LoftSign() {
       </group>
 
       {/* свет букв на плитке */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, 1.5]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.08, 1.5]}>
         <planeGeometry args={[total + 3, 4]} />
         <meshBasicMaterial map={glow} color="#fff3e0" transparent opacity={0.3} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>

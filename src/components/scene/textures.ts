@@ -223,6 +223,72 @@ export function concreteTexture() {
   return toTexture(c)
 }
 
+/**
+ * Резная ширма у входа в зал (на фото — светлая фанера с прорезями-листьями).
+ * Прорези вырезаны в альфе: с alphaTest сквозь ширму видно зал.
+ */
+export function carvedScreenTexture() {
+  const c = document.createElement('canvas')
+  c.width = 256
+  c.height = 512
+  const g = c.getContext('2d')!
+  const r = rand(91)
+  g.fillStyle = '#c9a377'
+  g.fillRect(0, 0, 256, 512)
+  for (let i = 0; i < 70; i++) {
+    g.strokeStyle = `rgba(120,80,40,${0.08 + r() * 0.1})`
+    g.beginPath()
+    const x = r() * 256
+    g.moveTo(x, 0)
+    g.lineTo(x + r() * 10 - 5, 512)
+    g.stroke()
+  }
+  g.globalCompositeOperation = 'destination-out'
+  // вытянутые «листья» под разными углами, рядами со сдвигом
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 4; col++) {
+      const x = 32 + col * 64 + (row % 2) * 32 + (r() - 0.5) * 10
+      const y = 30 + row * 56 + (r() - 0.5) * 10
+      g.save()
+      g.translate(x, y)
+      g.rotate((row % 2 ? 1 : -1) * (0.5 + r() * 0.4))
+      g.beginPath()
+      g.ellipse(0, 0, 9, 26, 0, 0, Math.PI * 2)
+      g.fill()
+      g.restore()
+    }
+  }
+  const tex = toTexture(c)
+  return tex
+}
+
+/**
+ * Подсветка потолочного короба: светлая полоса вдоль каждой кромки, к центру
+ * гаснет. Кладётся аддитивно на тёмный потолок — как засветка от LED-ленты.
+ */
+export function coveGlowTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  g.globalCompositeOperation = 'lighter'
+  // Узкая полоса: на плоскости 22 × 14 м 6% тайла — это ~1 м засветки у кромки.
+  // При 25% весь потолок заливало кислотно-зелёным
+  const edges: [number, number, number, number][] = [
+    [0, 0, 0, 16],
+    [0, 256, 0, 240],
+    [0, 0, 16, 0],
+    [256, 0, 240, 0],
+  ]
+  for (const [x0, y0, x1, y1] of edges) {
+    const grd = g.createLinearGradient(x0, y0, x1, y1)
+    grd.addColorStop(0, 'rgba(170,215,110,0.7)')
+    grd.addColorStop(1, 'rgba(190,235,120,0)')
+    g.fillStyle = grd
+    g.fillRect(0, 0, 256, 256)
+  }
+  return toTexture(c)
+}
+
 /** Столешницы зала «ёлочкой»: светлый дуб, как на фото у стены из мха */
 export function herringboneTexture() {
   const c = document.createElement('canvas')

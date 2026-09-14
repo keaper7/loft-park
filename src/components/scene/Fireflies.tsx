@@ -20,7 +20,8 @@ const vertex = /* glsl */ `
     p.z += sin(uTime * 0.29 + aPhase * 20.0) * 0.35;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = uSize * aScale * uPixelRatio / -mv.z;
+    // max(): у частицы на плоскости камеры размер уходил в бесконечность
+    gl_PointSize = uSize * aScale * uPixelRatio / max(-mv.z, 0.2);
     vAlpha = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(uTime * 1.7 + aPhase * 40.0), 3.0);
   }
 `
@@ -29,10 +30,12 @@ const fragment = /* glsl */ `
   uniform vec3 uColor;
   varying float vAlpha;
   void main() {
-    float d = distance(gl_PointCoord, vec2(0.5));
-    float glow = 0.05 / d - 0.1;
+    // d = 0 в центральном пикселе давал деление на ноль → Infinity/NaN в HDR-буфере,
+    // а bloom размазывал такой пиксель в чёрный квадрат на несколько кадров
+    float d = max(distance(gl_PointCoord, vec2(0.5)), 0.02);
+    float glow = min(0.05 / d - 0.1, 2.0);
     if (glow <= 0.0) discard;
-    gl_FragColor = vec4(uColor * 2.2, glow * vAlpha);
+    gl_FragColor = vec4(uColor * 2.2, clamp(glow * vAlpha, 0.0, 1.0));
   }
 `
 

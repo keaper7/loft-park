@@ -93,7 +93,8 @@ function useWater(deep: string, glow: string) {
 function Glow({ x, z, size, color = '#ffcf94', opacity = 0.5 }: { x: number; z: number; size: number; color?: string; opacity?: number }) {
   const tex = useMemo(() => glowTexture(), [])
   return (
-    <mesh rotation-x={-Math.PI / 2} position={[x, 0.03, z]}>
+    // 8 см над плиткой: ближе — издалека и сверху пятно мерцает (z-fighting)
+    <mesh rotation-x={-Math.PI / 2} position={[x, 0.08, z]}>
       <planeGeometry args={[size, size]} />
       <meshBasicMaterial map={tex} color={color} transparent opacity={opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
     </mesh>
@@ -439,17 +440,18 @@ const jetVertex = /* glsl */ `
     vec3 p = position + aDir * s + vec3(0.0, -4.9, 0.0) * s * s;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = 16.0 * uPixelRatio / -mv.z;
+    gl_PointSize = 16.0 * uPixelRatio / max(-mv.z, 0.2);
     vA = 1.0 - s * 0.6;
   }
 `
 const jetFragment = /* glsl */ `
   varying float vA;
   void main() {
-    float d = distance(gl_PointCoord, vec2(0.5));
-    float g = 0.08 / d - 0.16;
+    // защита от деления на ноль: иначе NaN → чёрные квадраты в bloom (см. Fireflies)
+    float d = max(distance(gl_PointCoord, vec2(0.5)), 0.02);
+    float g = min(0.08 / d - 0.16, 2.0);
     if (g <= 0.0) discard;
-    gl_FragColor = vec4(vec3(0.8, 0.93, 1.0) * 1.4, g * vA);
+    gl_FragColor = vec4(vec3(0.8, 0.93, 1.0) * 1.4, clamp(g * vA, 0.0, 1.0));
   }
 `
 

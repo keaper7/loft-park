@@ -108,10 +108,16 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
       (a, b) =>
         Math.hypot(LAMPS[a][0] - cx, LAMPS[a][2] - cz) - Math.hypot(LAMPS[b][0] - cx, LAMPS[b][2] - cz),
     )
+    // Свет плавно гаснет к пятому по дальности фонарю: когда лампа выбывает
+    // из четвёрки ближайших, её вклад уже ноль. Раньше свет «перепрыгивал»
+    // к другому фонарю мгновенно — на плитке были видны вспышки
+    const dist = (i: number) => Math.hypot(LAMPS[sorted.current[i]][0] - cx, LAMPS[sorted.current[i]][2] - cz)
+    const edge = dist(lights.current.length)
     lights.current.forEach((l, i) => {
       if (!l) return
       const p = LAMPS[sorted.current[i]]
       l.position.set(p[0], p[1] - 0.3, p[2])
+      l.intensity = 14 * THREE.MathUtils.clamp((edge - dist(i)) / 5, 0, 1)
     })
   })
 
@@ -125,17 +131,17 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
         <meshStandardMaterial color="#0b100c" roughness={1} />
       </mesh>
       {/* площадь аттракционов */}
-      <mesh rotation-x={-Math.PI / 2} position={[(PLAZA.x0 + PLAZA.x1) / 2, 0.008, (PLAZA.zNear + PLAZA.zFar) / 2]}>
+      <mesh rotation-x={-Math.PI / 2} position={[(PLAZA.x0 + PLAZA.x1) / 2, 0.02, (PLAZA.zNear + PLAZA.zFar) / 2]}>
         <planeGeometry args={[PLAZA.x1 - PLAZA.x0, PLAZA.zNear - PLAZA.zFar]} />
         <meshStandardMaterial map={plazaTex} color="#d6d0c6" roughness={0.9} />
       </mesh>
       {/* Главная аллея поперёк пути и серые бордюрные ленты по краям */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, alleyZ]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, alleyZ]}>
         <planeGeometry args={[ALLEY.x1 - ALLEY.x0, ALLEY.zNear - ALLEY.zFar]} />
         <meshStandardMaterial map={alleyTex} color="#e0b8a8" roughness={0.9} />
       </mesh>
       {[ALLEY.zNear, ALLEY.zFar].map((z) => (
-        <mesh key={z} rotation-x={-Math.PI / 2} position={[0, 0.016, z]}>
+        <mesh key={z} rotation-x={-Math.PI / 2} position={[0, 0.055, z]}>
           <planeGeometry args={[ALLEY.x1 - ALLEY.x0, 0.35]} />
           <meshStandardMaterial color="#77736d" roughness={0.9} />
         </mesh>
@@ -156,7 +162,7 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
             <cylinderGeometry args={[0.24, 0.24, 0.06, 12]} />
             <meshBasicMaterial color={[6, 4.4, 2.4]} toneMapped={false} />
           </mesh>
-          <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
+          <mesh rotation-x={-Math.PI / 2} position={[0, 0.09, 0]}>
             <planeGeometry args={[10, 10]} />
             <meshBasicMaterial map={glow} transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} />
           </mesh>

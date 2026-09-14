@@ -145,13 +145,14 @@ html.lenis body {
   100% { transform: translate(0, 0); }
 }
 
-/* Мерцание неона: неровный ритм, как у настоящей трубки */
+/* Мерцание неона: неровный ритм, как у настоящей трубки. Редко и неглубоко —
+   провалы до 0.45 каждые 5 секунд выглядели как баг, а не как эффект */
 @keyframes flicker {
-  0%, 19%, 21%, 23%, 55%, 57%, 100% { opacity: 1; }
-  20%, 22%, 56% { opacity: 0.45; }
+  0%, 44%, 46%, 47.5%, 100% { opacity: 1; }
+  45%, 46.8% { opacity: 0.78; }
 }
 .flicker {
-  animation: flicker 5.5s linear infinite;
+  animation: flicker 11s linear infinite;
 }
 
 @keyframes pulse-ring {

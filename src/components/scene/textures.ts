@@ -295,7 +295,8 @@ export function herringboneTexture() {
   c.width = c.height = 256
   const g = c.getContext('2d')!
   const r = rand(83)
-  g.fillStyle = '#6b4526'
+  // тёмные стыки между планками
+  g.fillStyle = '#3e2715'
   g.fillRect(0, 0, 256, 256)
   const s = 32
   for (let y = -s; y < 256 + s; y += s / 2) {
@@ -304,8 +305,19 @@ export function herringboneTexture() {
       g.save()
       g.translate(x + s / 2, y)
       g.rotate(left ? Math.PI / 4 : -Math.PI / 4)
-      g.fillStyle = `hsl(${30 + r() * 6} ${45 + r() * 10}% ${48 + r() * 10}%)`
+      // Медовый дуб под лаком: приглушённее прежнего оранжевого, у каждой
+      // планки свой тон, по планке — волокна
+      g.fillStyle = `hsl(${29 + r() * 7} ${34 + r() * 12}% ${34 + r() * 12}%)`
       g.fillRect(-s * 0.7, -s * 0.16, s * 1.4, s * 0.3)
+      for (let k = 0; k < 4; k++) {
+        g.strokeStyle = `rgba(${r() < 0.5 ? '40,22,10' : '235,190,130'},${0.08 + r() * 0.1})`
+        g.lineWidth = 0.6 + r() * 0.8
+        const yy = -s * 0.14 + r() * s * 0.26
+        g.beginPath()
+        g.moveTo(-s * 0.7, yy)
+        g.quadraticCurveTo(0, yy + (r() - 0.5) * 2, s * 0.7, yy + (r() - 0.5) * 1.5)
+        g.stroke()
+      }
       g.restore()
     }
   }

@@ -5,6 +5,8 @@ import * as THREE from 'three'
 import { POLES, SQUARE, TERRACE, TREES } from './layout'
 import { concreteTexture, paversTexture, planksTexture, slatsTexture, weaveTexture } from './textures'
 import { Instances, mat, seeded } from './instancing'
+import { crownGeometry, foliageMaterial, puffGeometry } from './foliage'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /**
  * Площадь и терраса Loft Park — по фотографиям гостей:
@@ -66,26 +68,76 @@ function Festoons({ spans, density }: { spans: Span[]; density: number }) {
         </mesh>
       ))}
       <instancedMesh ref={bulbs} args={[undefined, undefined, points.length]}>
-        <sphereGeometry args={[0.06, 8, 6]} />
-        <meshBasicMaterial color={[5.5, 3.6, 1.6]} toneMapped={false} />
+        {/* Лампочка тусклее и мельче: при прежней яркости bloom раздувал
+            каждую в шар размером с голову, особенно под маркизами у камеры */}
+        <sphereGeometry args={[0.05, 8, 6]} />
+        <meshBasicMaterial color={[3.6, 2.35, 1.05]} toneMapped={false} />
       </instancedMesh>
     </group>
   )
 }
 
-/** Маркиза складками: зигзаг поперёк, как у выдвижных тентов на фото */
-function pleatGeometry(w: number, d: number, pleat = 0.3, amp = 0.07) {
-  const seg = Math.max(8, Math.round(w / pleat) * 2)
+/**
+ * Маркиза складками, как у выдвижных тентов на фото. Складка — плавная
+ * волна, а не зигзаг: острые зубья по торцам полотен читались пилой.
+ */
+function pleatGeometry(w: number, d: number, pleat = 0.3, amp = 0.045) {
+  const waves = Math.max(4, Math.round(w / pleat))
+  const seg = waves * 6
   const g = new THREE.PlaneGeometry(w, d, seg, 1)
   g.rotateX(-Math.PI / 2)
   const p = g.attributes.position
-  const step = w / seg
   for (let i = 0; i < p.count; i++) {
-    const j = Math.round((p.getX(i) + w / 2) / step)
-    p.setY(i, j % 2 ? amp : 0)
+    const u = (p.getX(i) + w / 2) / w
+    p.setY(i, amp * (0.5 - 0.5 * Math.cos(u * waves * Math.PI * 2)))
   }
   g.computeVertexNormals()
   return g
+}
+
+/**
+ * Плетёное кресло-«таб», как на фото террасы: полукруглая спинка плавно
+ * опускается в подлокотники, по верху — толстый валик, под сиденьем плетёная
+ * база на четырёх ножках. Прежние «бочонки» без подлокотников и ножек
+ * выглядели как корзины для бумаг. Спинка — у локального +z, пол — y = 0.
+ */
+function rattanChairGeometries() {
+  const SEAT = 0.4
+  const ARC = Math.PI * 0.72
+  const R_TOP = 0.37
+  const R_BOT = 0.3
+  const profile = (theta: number) => {
+    const k = THREE.MathUtils.smoothstep(Math.min(1, Math.abs(theta) / ARC), 0.3, 1)
+    return 0.2 + 0.38 * (1 - k)
+  }
+  const shell = new THREE.CylinderGeometry(R_TOP, R_BOT, 1, 32, 4, true, -ARC, ARC * 2)
+  const p = shell.attributes.position
+  for (let i = 0; i < p.count; i++) p.setY(i, SEAT + (p.getY(i) + 0.5) * profile(Math.atan2(p.getX(i), p.getZ(i))))
+  shell.computeVertexNormals()
+  const base = new THREE.CylinderGeometry(0.3, 0.25, 0.22, 24, 1, true)
+  base.translate(0, SEAT - 0.11, 0)
+
+  const rimPts = Array.from({ length: 25 }, (_, i) => {
+    const th = -ARC + (i / 24) * ARC * 2
+    return new THREE.Vector3(Math.sin(th) * R_TOP, SEAT + profile(th), Math.cos(th) * R_TOP)
+  })
+  const rim = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPts), 40, 0.03, 6, false)
+  const ring = new THREE.TorusGeometry(0.3, 0.022, 6, 24)
+  ring.rotateX(Math.PI / 2)
+  ring.translate(0, SEAT, 0)
+  const legs = [1, 3, 5, 7].map((k) => {
+    const a = (k * Math.PI) / 4
+    const g = new THREE.CylinderGeometry(0.02, 0.015, SEAT - 0.2, 5)
+    g.translate(Math.sin(a) * 0.2, (SEAT - 0.2) / 2, Math.cos(a) * 0.2)
+    return g
+  })
+  const cushion = new THREE.CylinderGeometry(0.28, 0.28, 0.1, 18)
+  cushion.translate(0, SEAT + 0.05, 0)
+  return {
+    woven: mergeGeometries([shell, base])!,
+    frame: mergeGeometries([rim, ring, ...legs])!,
+    cushion,
+  }
 }
 
 /** Стриженый кустарник: коробка с неровной поверхностью */
@@ -141,20 +193,21 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       box: new THREE.BoxGeometry(1, 1, 1),
       hedge: hedgeGeometry(),
       pleat: pleatGeometry(2.34, 2.74),
-      // плетёное кресло-корзинка: спинка — открытый полуцилиндр, низ — конус
-      // без крышек; оба сквозные за счёт плетёнки с просветами
-      tubBack: new THREE.CylinderGeometry(0.35, 0.31, 0.5, 20, 1, true, -Math.PI * 0.62, Math.PI * 1.24),
-      tubSkirt: new THREE.CylinderGeometry(0.31, 0.22, 0.42, 16, 1, true),
-      cushion: new THREE.CylinderGeometry(0.28, 0.28, 0.09, 14),
+      chair: rattanChairGeometries(),
       leg: new THREE.CylinderGeometry(0.035, 0.035, 1, 6),
-      bloom: new THREE.IcosahedronGeometry(1, 0),
+      bloom: puffGeometry(),
+      smallCrown: crownGeometry(31, 4, 1),
       curtain: curtainGeometry(1.3, T.roofY - 0.1),
     }),
     [T.roofY],
   )
   const mats = useMemo(
     () => ({
-      awning: new THREE.MeshStandardMaterial({ color: '#d8cdb6', roughness: 0.9, side: THREE.DoubleSide }),
+      // Снизу ткань светлая и тёплая от ламп; сверху — отдельная тёмная
+      // сторона: с высоты светлые полотна под небесным светом читались
+      // сеткой солнечных панелей
+      awning: new THREE.MeshStandardMaterial({ color: '#d8cdb6', roughness: 0.9, side: THREE.BackSide }),
+      awningTop: new THREE.MeshStandardMaterial({ color: '#5e5446', roughness: 1 }),
       rib: new THREE.MeshStandardMaterial({ color: '#19191b', roughness: 0.95 }),
       planter: new THREE.MeshStandardMaterial({ map: tex.slats, roughness: 0.8 }),
       hedge: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }),
@@ -162,8 +215,11 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       screen: new THREE.MeshStandardMaterial({ map: tex.screen, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 }),
       tableWood: new THREE.MeshStandardMaterial({ color: '#c08a52', roughness: 0.55 }),
       rattan: new THREE.MeshStandardMaterial({ map: tex.weave, alphaTest: 0.5, roughness: 1, side: THREE.DoubleSide }),
+      rattanSolid: new THREE.MeshStandardMaterial({ color: '#9c7446', roughness: 0.9 }),
       cushion: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
-      bloom: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }),
+      bloom: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }),
+      leafGreen: foliageMaterial({ color: '#5a8f48' }),
+      leafRed: foliageMaterial({ color: '#8a4432' }),
       red: new THREE.MeshStandardMaterial({ color: '#a4151f', roughness: 0.85, side: THREE.DoubleSide }),
       redSeat: new THREE.MeshStandardMaterial({ color: '#b5202a', roughness: 0.7 }),
       sofa: new THREE.MeshStandardMaterial({ color: '#8d8b86', roughness: 0.95 }),
@@ -236,7 +292,7 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       [0.2, -84.4],
     ]
     const palette = ['#8fa3ad', '#e08a5a', '#e6dccb', '#5f9c95'].map((c) => new THREE.Color(c))
-    const out = { tops: [] as THREE.Matrix4[], legs: [] as THREE.Matrix4[], backs: [] as THREE.Matrix4[], skirts: [] as THREE.Matrix4[], cushions: [] as THREE.Matrix4[], cushionColors: [] as THREE.Color[] }
+    const out = { tops: [] as THREE.Matrix4[], legs: [] as THREE.Matrix4[], chairs: [] as THREE.Matrix4[], cushionColors: [] as THREE.Color[] }
     tables.forEach(([x, z], ti) => {
       out.tops.push(mat([x, DECK_Y + 0.75, z], [1.3, 0.05, 0.85]))
       ;[-0.5, 0.5].forEach((dx) => out.legs.push(mat([x + dx, DECK_Y + 0.37, z], [1, 0.74, 1])))
@@ -244,9 +300,7 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         const ry = a + (r() - 0.5) * 0.35
         const cx = x + Math.sin(a) * 0.95 + (r() - 0.5) * 0.2
         const cz = z + Math.cos(a) * 0.95
-        out.skirts.push(mat([cx, DECK_Y + 0.21, cz], [1, 1, 1], ry))
-        out.backs.push(mat([cx, DECK_Y + 0.62, cz], [1, 1, 1], ry))
-        out.cushions.push(mat([cx, DECK_Y + 0.46, cz], [1, 1, 1], ry))
+        out.chairs.push(mat([cx, DECK_Y, cz], [1, 1, 1], ry))
         out.cushionColors.push(palette[(ti + k) % palette.length])
       })
     })
@@ -261,13 +315,14 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
     const palette = ['#e9a3b8', '#f3eee6', '#c7849a', '#f6c6d2', '#5f7f47', '#7d9a5c'].map((c) => new THREE.Color(c))
     // Много мелких «цветков», а не десяток крупных: крупные вблизи
     // выглядели как летающие камни
-    const n = quality === 'high' ? 620 : 300
+    const n = quality === 'high' ? 760 : 360
     for (let i = 0; i < n; i++) {
       const x = 8.6 + r() * 3.2
       const z = -76.8 - r() * 5.6
       // гуще у крыши, редкие «плети» свисают ниже
       const y = T.roofY - 0.1 - Math.pow(r(), 2.4) * 0.85
-      const s = 0.03 + r() * 0.05
+      // мельче и гуще: вблизи крупные помпоны читались ватными шариками
+      const s = 0.024 + r() * 0.036
       items.push(mat([x, y, z], [s, s, s], r() * 3, r() * 3))
       colors.push(palette[Math.floor(r() * palette.length)])
     }
@@ -387,10 +442,7 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
             <cylinderGeometry args={[0.045, 0.06, 1.6, 6]} />
             <meshStandardMaterial color="#4a3a2c" roughness={1} />
           </mesh>
-          <mesh position={[0, 2.85, 0]} scale={[0.8, 0.72, 0.8]}>
-            <icosahedronGeometry args={[1, 2]} />
-            <meshStandardMaterial color={i === 1 ? '#6b3a2e' : '#3f6e34'} roughness={1} flatShading />
-          </mesh>
+          <mesh position={[0, 2.85, 0]} scale={[0.85, 0.75, 0.85]} rotation-y={i * 1.9} geometry={geos.smallCrown} material={i === 1 ? mats.leafRed : mats.leafGreen} />
         </group>
       ))}
 
@@ -411,6 +463,14 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         </mesh>
       ))}
       <Instances items={awning} geometry={geos.pleat} material={mats.awning} />
+      <Instances items={awning} geometry={geos.pleat} material={mats.awningTop} />
+      {/* поперечные профили на стыках полотен: без них торцы складок
+          читались пилой через весь потолок террасы */}
+      {Array.from({ length: Math.round((T.zFront - T.zBack) / 2.8) - 1 }, (_, i) => T.zFront - 2.8 * (i + 1)).map((z) => (
+        <mesh key={z} position={[0, T.roofY + 0.03, z]} material={mats.rib}>
+          <boxGeometry args={[T.x1 - T.x0, 0.1, 0.09]} />
+        </mesh>
+      ))}
 
       {/* левый бок — реечная перегородка во всю длину */}
       <mesh position={[T.x0 - 0.05, 1.25 + DECK_Y, midZ]} rotation-y={Math.PI / 2} material={mats.screen}>
@@ -425,9 +485,9 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       {/* кресла и столы */}
       <Instances items={dining.tops} geometry={geos.box} material={mats.tableWood} />
       <Instances items={dining.legs} geometry={geos.leg} material={steel} />
-      <Instances items={dining.skirts} geometry={geos.tubSkirt} material={mats.rattan} />
-      <Instances items={dining.backs} geometry={geos.tubBack} material={mats.rattan} />
-      <Instances items={dining.cushions} geometry={geos.cushion} material={mats.cushion} colors={dining.cushionColors} />
+      <Instances items={dining.chairs} geometry={geos.chair.woven} material={mats.rattan} />
+      <Instances items={dining.chairs} geometry={geos.chair.frame} material={mats.rattanSolid} />
+      <Instances items={dining.chairs} geometry={geos.chair.cushion} material={mats.cushion} colors={dining.cushionColors} />
 
       {/* плетёные подвесные лампы-корзины над столами */}
       {[
@@ -449,10 +509,13 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
             <meshBasicMaterial color={[5, 3, 1.2]} toneMapped={false} />
           </mesh>
           {[0, 1, 2, 3, 4].map((k) => (
-            <mesh key={k} position={[Math.cos(k * 1.26) * 0.3, -0.78 - (k % 2) * 0.12, Math.sin(k * 1.26) * 0.3]} scale={0.12}>
-              <icosahedronGeometry args={[1, 0]} />
-              <meshStandardMaterial color="#4f7a3c" roughness={1} flatShading />
-            </mesh>
+            <mesh
+              key={k}
+              position={[Math.cos(k * 1.26) * 0.3, -0.78 - (k % 2) * 0.12, Math.sin(k * 1.26) * 0.3]}
+              scale={0.13}
+              geometry={geos.bloom}
+              material={mats.leafGreen}
+            />
           ))}
         </group>
       ))}
@@ -531,7 +594,8 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         [-11.3, -78.6],
         [-11.3, -82.4],
       ].map(([x, z]) => (
-        <group key={x} position={[x, DECK_Y, z]}>
+        // ключ по двум координатам: оба обогревателя стоят на x = −11.3
+        <group key={`${x}${z}`} position={[x, DECK_Y, z]}>
           <mesh position={[0, 1.15, 0]} rotation-y={Math.PI / 4}>
             <coneGeometry args={[0.36, 2.3, 4, 1, true]} />
             <meshStandardMaterial color="#1c1c1f" metalness={0.8} roughness={0.35} wireframe />

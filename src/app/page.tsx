@@ -18,7 +18,8 @@ export default function Page() {
   return (
     <>
       <Hero />
-      <Chapter id="park" cam={1} align="right" {...chapters.park} />
+      {/* колесо обозрения в кадре справа — текст слева, чтобы его не закрывать */}
+      <Chapter id="park" cam={1} align="left" {...chapters.park} />
       {/* буквы LOFT PARK в кадре справа — текст слева */}
       <Chapter cam={2} align="left" {...chapters.facade} />
       <Chapter cam={3} align="left" {...chapters.loft} />

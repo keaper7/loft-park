@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useAnimationFrame, useMotionValue, useScroll, useSpring, useTransform, useVelocity } from 'motion/react'
+import { motion, useAnimationFrame, useInView, useMotionValue, useScroll, useSpring, useTransform, useVelocity } from 'motion/react'
+import { useRef } from 'react'
 import { marquee } from '@/content'
 import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion'
 
@@ -15,13 +16,16 @@ function wrap(min: number, max: number, v: number) {
  */
 function Row({ dir, tilt, serif }: { dir: 1 | -1; tilt: number; serif?: boolean }) {
   const reduced = usePrefersReducedMotion()
+  const ref = useRef<HTMLDivElement>(null)
+  // за экраном лента стоит: иначе широкий слой перерисовывался бы всё время
+  const visible = useInView(ref, { margin: '200px 0px' })
   const base = useMotionValue(0)
   const { scrollY } = useScroll()
   const vel = useSpring(useVelocity(scrollY), { damping: 50, stiffness: 400 })
   const factor = useTransform(vel, [-1500, 1500], [-4, 4], { clamp: false })
 
   useAnimationFrame((_, delta) => {
-    if (reduced) return
+    if (reduced || !visible) return
     const f = factor.get()
     base.set(base.get() + dir * -1.2 * (delta / 1000) * (1 + Math.abs(f)))
   })
@@ -39,7 +43,7 @@ function Row({ dir, tilt, serif }: { dir: 1 | -1; tilt: number; serif?: boolean 
   )
 
   return (
-    <div className="overflow-hidden py-3" style={{ transform: `rotate(${tilt}deg)` }}>
+    <div ref={ref} className="overflow-hidden py-3" style={{ transform: `rotate(${tilt}deg)` }}>
       <motion.div className="flex w-max" style={{ x }}>
         {items}
         {items}
@@ -52,7 +56,7 @@ function Row({ dir, tilt, serif }: { dir: 1 | -1; tilt: number; serif?: boolean 
 
 export function Marquee() {
   return (
-    <div aria-hidden="true" className="relative -my-10 overflow-hidden bg-ink/90 py-16">
+    <div aria-hidden="true" className="relative -my-10 overflow-hidden bg-ink py-16">
       <div className="border-y border-[var(--hair)] bg-brick/30">
         <Row dir={1} tilt={0} />
       </div>

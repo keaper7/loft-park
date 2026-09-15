@@ -16,10 +16,20 @@ import type { NextConfig } from 'next'
  */
 const REPO = 'loft-park'
 
+/**
+ * Подпуть — только в продакшен-сборке. В `npm run dev` сайт живёт в корне:
+ * иначе адрес, который печатает dev-сервер (localhost:3000), показывал
+ * заглушку «404 This page could not be found» поверх 3D-сцены, а рабочим
+ * был только localhost:3000/loft-park/ — ловушка при каждом запуске.
+ */
+const BASE_PATH = process.env.NODE_ENV === 'production' ? `/${REPO}` : ''
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'export',
-  basePath: `/${REPO}`,
+  basePath: BASE_PATH,
+  // для ссылки «На главную» со страницы 404 (NotFoundView)
+  env: { NEXT_PUBLIC_BASE_PATH: BASE_PATH },
   trailingSlash: true,
   images: { unoptimized: true },
 }

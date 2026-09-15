@@ -27,7 +27,20 @@ export function SmoothScroll() {
       updateScroll(window.scrollY)
       ScrollTrigger.refresh()
     }
-    const ro = new ResizeObserver(() => remeasure())
+    // refresh перестраивает закреплённую ленту веранды — если звать его на
+    // каждое изменение высоты (фильтр меню, подгрузка шрифта), лента дёргалась.
+    // Ждём, пока размеры успокоятся, и пересчитываем только при реальной смене.
+    let timer = 0
+    let lastW = 0
+    let lastH = 0
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (Math.abs(width - lastW) < 1 && Math.abs(height - lastH) < 1) return
+      lastW = width
+      lastH = height
+      window.clearTimeout(timer)
+      timer = window.setTimeout(remeasure, 150)
+    })
     ro.observe(document.body)
     document.fonts?.ready.then(remeasure)
     remeasure()
@@ -93,6 +106,7 @@ export function SmoothScroll() {
     }
 
     return () => {
+      window.clearTimeout(timer)
       ro.disconnect()
       window.removeEventListener('pointermove', onMouse)
       cleanup()

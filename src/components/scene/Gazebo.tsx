@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { fx } from './fx'
 import { GAZEBO } from './layout'
 import { Instances, mat, seeded } from './instancing'
+import { puffGeometry } from './foliage'
 
 // Туман подключён штатными чанками three.js: без него шторы с аллеи
 // горели белой стеной сквозь ночную дымку
@@ -34,9 +35,12 @@ const curtainFragment = /* glsl */ `
   varying vec2 vUv;
   varying float vFold;
   void main() {
-    float shade = 0.8 + 0.2 * vFold;
-    // ночью тюль подсвечен тёплыми лампами изнутри, а не белый
-    gl_FragColor = vec4(vec3(0.82, 0.72, 0.58) * shade, 0.32 + 0.1 * vFold);
+    float shade = 0.75 + 0.25 * vFold;
+    // Ночью тюль — полупрозрачная ткань, подсвеченная сверху лампочками в
+    // «облаке» цветов: теплее и ярче у крыши, темнее к полу. Прежний почти
+    // белый цвет на фоне ночной сцены горел сплошной белой стеной.
+    float lit = mix(0.16, 0.42, smoothstep(0.1, 1.0, vUv.y));
+    gl_FragColor = vec4(vec3(0.95, 0.78, 0.58) * lit * shade, 0.36 + 0.12 * vFold);
     #include <fog_fragment>
   }
 `
@@ -67,15 +71,15 @@ export function Gazebo() {
     [G, cx, cz, d, w],
   )
 
-  const bloomGeo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
-  const bloomMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }), [])
+  const bloomGeo = useMemo(() => puffGeometry(), [])
+  const bloomMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }), [])
   const blooms = useMemo(() => {
     const r = seeded(57)
     const palette = ['#e9a3b8', '#f3eee6', '#c7849a', '#9fb3ad', '#5f7f47', '#7d9a5c'].map((c) => new THREE.Color(c))
     const items: THREE.Matrix4[] = []
     const colors: THREE.Color[] = []
     for (let i = 0; i < 520; i++) {
-      const s = 0.03 + r() * 0.055
+      const s = 0.026 + r() * 0.042
       // гуще у крыши, редкие «плети» свисают ниже
       items.push(mat([G.x0 + 0.6 + r() * (w - 1.2), G.h - 0.1 - Math.pow(r(), 2.2) * 0.9, G.zFar + 0.6 + r() * (d - 1.2)], [s, s, s], r() * 3, r() * 3))
       colors.push(palette[Math.floor(r() * palette.length)])

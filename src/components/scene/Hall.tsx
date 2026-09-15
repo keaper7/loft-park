@@ -11,6 +11,7 @@ import {
   carvedScreenTexture,
   concreteTexture,
   coveGlowTexture,
+  glowTexture,
   herringboneTexture,
   mossTexture,
   planksTexture,
@@ -19,6 +20,7 @@ import {
 import { buildWord, useEmblem } from './LoftSign'
 import { DJBooth } from './DJBooth'
 import { Instances, mat, seeded } from './instancing'
+import { crownGeometry, foliageMaterial, puffGeometry } from './foliage'
 
 /**
  * Закрытый зал Loft Park по фотографиям гостей:
@@ -116,6 +118,7 @@ export function Hall() {
       brick: brickTexture([0.5, 2.4]),
       plaster: concreteTexture(),
       cove: coveGlowTexture(),
+      spot: glowTexture(),
       screen: carvedScreenTexture(),
       herring,
       longHerring,
@@ -132,7 +135,8 @@ export function Hall() {
       box: new THREE.BoxGeometry(1, 1, 1),
       cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
       ball: new THREE.SphereGeometry(1, 14, 10),
-      leaf: new THREE.IcosahedronGeometry(1, 0),
+      leaf: puffGeometry(),
+      plantCrown: crownGeometry(21, 4, 1),
       sofa: sofaGeometry(2.3),
       longSofa: sofaGeometry(4.2),
       armchair: armchairGeometry(),
@@ -155,9 +159,12 @@ export function Hall() {
       wire: new THREE.MeshBasicMaterial({ color: '#111' }),
       bulb: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.6, 1.5), toneMapped: false }),
       bottle: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 }),
-      leaf: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true }),
+      leaf: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }),
+      foliage: foliageMaterial({ color: '#4d8a44' }),
       plain: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 }),
-      cove: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.1, 1.7, 0.45), toneMapped: false }),
+      // Яркость на пороге bloom: лента читается светящейся, но у камеры
+      // кадра 7 (она прямо под лентой) не разливается зелёным пятном в полэкрана
+      cove: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 1.15, 0.32), toneMapped: false }),
       soffit: new THREE.MeshStandardMaterial({ map: tex.plaster, color: '#8d8b86', roughness: 0.9 }),
       leather: new THREE.MeshStandardMaterial({ color: '#b8672c', roughness: 0.45 }),
       shelfGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2, 0.9), toneMapped: false }),
@@ -371,7 +378,7 @@ export function Hall() {
       </mesh>
       <mesh rotation-x={Math.PI / 2} position={[0, H.h - 0.01, cz]}>
         <planeGeometry args={[width - COVE * 2, depth - COVE * 2]} />
-        <meshBasicMaterial map={tex.cove} transparent opacity={0.4} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <meshBasicMaterial map={tex.cove} transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh position={[0, H.h + 0.18, cz]}>
         <boxGeometry args={[width + 0.6, 0.34, depth + 0.6]} />
@@ -498,6 +505,15 @@ export function Hall() {
       {[-3.6, -2.2, 2.2, 3.6].map((x) => (
         <mesh key={x} position={[x, SOFFIT_Y - 0.2, H.zBack + COVE]} rotation-x={0.7} material={steel}>
           <cylinderGeometry args={[0.06, 0.05, 0.22, 10]} />
+        </mesh>
+      ))}
+      {/* Тёплые пятна от спотов на мху, как на фото стены: без них стена
+          была ровно-тёмной, а буквы — плоскими. Аддитивные плоскости вместо
+          четырёх spotLight: каждый источник света дорожает для всех материалов */}
+      {[-3.6, -2.2, 2.2, 3.6].map((x) => (
+        <mesh key={`pool${x}`} position={[x * 0.92, SOFFIT_Y - 1.15, H.zBack + 0.075]}>
+          <planeGeometry args={[2.1, 2.7]} />
+          <meshBasicMaterial map={tex.spot} transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       ))}
       <group position={[-2.4, 2.95, H.zBack + 0.75]}>
@@ -636,10 +652,14 @@ export function Hall() {
             <meshStandardMaterial color="#26282a" roughness={0.8} />
           </mesh>
           {[0, 1, 2, 3, 4].map((k) => (
-            <mesh key={k} position={[Math.cos(k * 1.7) * 0.25, 1.15 + k * 0.28, Math.sin(k * 1.7) * 0.25]} scale={[0.45, 0.42, 0.45]}>
-              <icosahedronGeometry args={[1, 1]} />
-              <meshStandardMaterial color={k % 2 ? '#2f6a33' : '#3f7c3c'} roughness={1} flatShading />
-            </mesh>
+            <mesh
+              key={k}
+              geometry={geos.plantCrown}
+              material={mats.foliage}
+              position={[Math.cos(k * 1.7) * 0.22, 1.15 + k * 0.28, Math.sin(k * 1.7) * 0.22]}
+              rotation-y={k * 1.3}
+              scale={[0.46, 0.42, 0.46]}
+            />
           ))}
         </group>
       ))}

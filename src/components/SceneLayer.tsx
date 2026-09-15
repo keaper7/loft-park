@@ -34,7 +34,10 @@ export function SceneLayer() {
   }, [setReady])
 
   return (
-    <div className="fixed inset-0 z-0" aria-hidden="true">
+    // h-lvh, а не inset-0: на телефоне при скролле прячется адресная строка,
+    // видимая высота меняется, и холст пересоздавал буфер — вспышка чёрным.
+    // Большая высота вьюпорта постоянна, холст не меняет размер никогда.
+    <div className="fixed left-0 top-0 z-0 h-lvh w-full" aria-hidden="true">
       {mode === 'none' && (
         <div
           className="absolute inset-0"

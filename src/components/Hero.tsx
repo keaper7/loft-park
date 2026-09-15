@@ -44,15 +44,19 @@ export function Hero() {
 
   return (
     <section id="top" ref={ref} data-cam="0" className="relative flex min-h-[100svh] flex-col justify-end px-[var(--pad)] pb-[8vh] pt-32">
-      <motion.p
-        className="micro mb-6 text-amber"
-        initial={{ opacity: 0, y: 12 }}
-        animate={show ? { opacity: 1, y: 0 } : undefined}
-        transition={{ duration: 1, ease: EASE, delay: 0.1 }}
-        style={{ opacity: fade }}
-      >
-        {eyebrow}
-      </motion.p>
+      {/* Появление и затухание по скроллу — на разных элементах. На одном
+          initial-прозрачность и style-прозрачность от скролла спорили:
+          сервер рисовал 1, клиент 0 — ошибка гидратации в консоли */}
+      <motion.div style={{ opacity: fade }}>
+        <motion.p
+          className="micro mb-6 text-amber"
+          initial={{ opacity: 0, y: 12 }}
+          animate={show ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 1, ease: EASE, delay: 0.1 }}
+        >
+          {eyebrow}
+        </motion.p>
+      </motion.div>
 
       {/* нижняя граница 40px: при 52px «LOFT PARK» на 375px вылезал на 2px за край */}
       <h1 className="display neon text-[clamp(40px,12.6vw,250px)] leading-[0.82]" style={{ perspective: 800 }} aria-label="Loft Park">
@@ -93,21 +97,25 @@ export function Hero() {
 
       <motion.a
         href="#park"
-        className="micro absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-3 text-[var(--dim-2)] md:flex"
-        initial={{ opacity: 0 }}
-        animate={show ? { opacity: 1 } : undefined}
-        transition={{ delay: 1.8, duration: 1 }}
+        className="micro absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-[var(--dim-2)] md:block"
         style={{ opacity: fade }}
         data-cursor="В парк"
       >
-        Листайте — идём в парк
-        <span className="relative h-10 w-px overflow-hidden bg-[var(--hair)]">
-          <motion.span
-            className="absolute inset-x-0 top-0 h-1/2 bg-amber"
-            animate={reduced ? undefined : { y: ['-100%', '200%'] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </span>
+        <motion.span
+          className="flex flex-col items-center gap-3"
+          initial={{ opacity: 0 }}
+          animate={show ? { opacity: 1 } : undefined}
+          transition={{ delay: 1.8, duration: 1 }}
+        >
+          Листайте — идём в парк
+          <span className="relative h-10 w-px overflow-hidden bg-[var(--hair)]">
+            <motion.span
+              className="absolute inset-x-0 top-0 h-1/2 bg-amber"
+              animate={reduced ? undefined : { y: ['-100%', '200%'] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </span>
+        </motion.span>
       </motion.a>
     </section>
   )

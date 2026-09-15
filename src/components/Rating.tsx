@@ -35,7 +35,18 @@ export function Rating() {
         <div className="display neon text-[clamp(120px,24vw,360px)] leading-[0.8] tabular-nums">{value.toFixed(1).replace('.', ',')}</div>
         <div className="mt-8 flex gap-3">
           {[0, 1, 2, 3, 4].map((i) => (
-            <svg key={i} viewBox="0 0 24 24" className="h-[clamp(28px,3vw,44px)] w-[clamp(28px,3vw,44px)]">
+            <svg key={i} viewBox="0 0 24 24" className="h-[clamp(28px,3vw,44px)] w-[clamp(28px,3vw,44px)] overflow-visible">
+              {/* ореол — широкий полупрозрачный контур, а не filter: drop-shadow */}
+              <motion.path
+                d={STAR}
+                fill="none"
+                stroke="#ffb561"
+                strokeWidth="5"
+                strokeLinejoin="round"
+                initial={{ opacity: 0 }}
+                animate={inView ? { opacity: 0.22 } : undefined}
+                transition={{ duration: 0.8, delay: 1.1 + i * 0.15 }}
+              />
               <motion.path
                 d={STAR}
                 fill="none"
@@ -51,7 +62,7 @@ export function Rating() {
                 initial={{ opacity: 0, scale: 0.4 }}
                 animate={inView ? { opacity: 1, scale: 1 } : undefined}
                 transition={{ duration: 0.6, delay: 1 + i * 0.15, ease: EASE }}
-                style={{ transformOrigin: 'center', filter: 'drop-shadow(0 0 8px rgba(255,181,97,.7))' }}
+                style={{ transformOrigin: 'center' }}
               />
             </svg>
           ))}

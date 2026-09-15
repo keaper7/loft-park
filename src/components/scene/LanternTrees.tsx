@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { fx } from './fx'
 import { TREES } from './layout'
 import { concreteTexture } from './textures'
+import { crownGeometry, foliageMaterial } from './foliage'
 
 /**
  * Старые деревья Loft Park — то, что видно с аллеи раньше самого здания.
@@ -35,8 +36,12 @@ const fairyVertex = /* glsl */ `
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = 34.0 * uPixelRatio / max(-mv.z, 0.2);
-    vA = 0.6 + 0.4 * sin(uTime * 2.3 + aPhase * 50.0);
+    // Не меньше двух пикселей: с площади огоньки в 1 px терялись, и обмотанный
+    // гирляндой ствол не светился колонной, как на фото. Не больше 40 px вблизи.
+    gl_PointSize = clamp(52.0 * uPixelRatio / max(-mv.z, 0.2), 2.2 * uPixelRatio, 40.0 * uPixelRatio);
+    // вдали точки не тонут в тумане (своего тумана у них нет) — гасим вручную
+    float far = clamp(1.0 - (-mv.z - 35.0) / 90.0, 0.3, 1.0);
+    vA = (0.6 + 0.4 * sin(uTime * 2.3 + aPhase * 50.0)) * far;
   }
 `
 const fairyFragment = /* glsl */ `
@@ -46,7 +51,8 @@ const fairyFragment = /* glsl */ `
     float d = max(distance(gl_PointCoord, vec2(0.5)), 0.02);
     float g = min(0.06 / d - 0.12, 2.0);
     if (g <= 0.0) discard;
-    gl_FragColor = vec4(vec3(2.6, 2.0, 1.15), clamp(g * vA, 0.0, 1.0));
+    // тёплый янтарь гирлянды: белее — и в bloom стволы выглядели холодным кораллом
+    gl_FragColor = vec4(vec3(2.5, 1.7, 0.8), clamp(g * vA, 0.0, 1.0));
   }
 `
 
@@ -96,6 +102,9 @@ export function LanternTrees({ quality }: { quality: 'high' | 'low' }) {
   const dpr = useThree((s) => s.viewport.dpr)
   const lanternGeo = useMemo(() => lanternGeometry(), [])
   const concrete = useMemo(() => concreteTexture(), [])
+  const crownGeo = useMemo(() => crownGeometry(13, 3, 2), [])
+  // слабое свечение: ночью листва подсвечена гирляндами снизу
+  const crownMat = useMemo(() => foliageMaterial({ emissive: '#1a2a0c', emissiveIntensity: 0.7 }), [])
 
   const data = useMemo(() => {
     const r = seeded(77)
@@ -246,11 +255,7 @@ export function LanternTrees({ quality }: { quality: 'high' | 'low' }) {
         {/* тёплый отсвет: кора под сплошной гирляндой не бывает чёрной */}
         <meshStandardMaterial color="#3a2d24" roughness={1} emissive="#5a3a14" emissiveIntensity={0.55} />
       </instancedMesh>
-      <instancedMesh ref={crowns} args={[undefined, undefined, data.crownM.length]}>
-        <icosahedronGeometry args={[1, 2]} />
-        {/* слабое свечение: ночью листва подсвечена гирляндами снизу */}
-        <meshStandardMaterial roughness={0.9} emissive="#10230a" emissiveIntensity={0.8} />
-      </instancedMesh>
+      <instancedMesh ref={crowns} args={[crownGeo, crownMat, data.crownM.length]} />
 
       {/* бетонные кашпо, из которых растут деревья террасы */}
       {planters.map((t) => (

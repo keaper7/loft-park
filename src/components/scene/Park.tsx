@@ -7,6 +7,43 @@ import * as THREE from 'three'
 import { glowTexture, paversTexture } from './textures'
 import { Fireflies } from './Fireflies'
 import { ALLEY, PLAZA } from './layout'
+import { crownGeometry, foliageMaterial } from './foliage'
+
+const skyVertex = /* glsl */ `
+  varying vec3 vDir;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vDir = wp.xyz - cameraPosition;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`
+// У горизонта небо над городом не чёрное: засветка от Нальчика, тёплая
+// и мутная, выше — глубокий синий. Цвет горизонта берётся из тумана,
+// поэтому дальние деревья растворяются в небе без шва.
+const skyFragment = /* glsl */ `
+  uniform vec3 fogColor;
+  varying vec3 vDir;
+  void main() {
+    float h = normalize(vDir).y;
+    vec3 zenith = vec3(0.0022, 0.0032, 0.0075);
+    vec3 horizon = fogColor * 1.1 + vec3(0.02, 0.0135, 0.012);
+    float t = pow(smoothstep(-0.04, 0.55, h), 0.65);
+    gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
+  }
+`
+
+/** Небесный купол: едет вместе с камерой, рисуется первым и не пишет глубину */
+function Sky() {
+  const mesh = useRef<THREE.Mesh>(null)
+  const uniforms = useMemo(() => THREE.UniformsUtils.clone(THREE.UniformsLib.fog), [])
+  useFrame(({ camera }) => mesh.current?.position.copy(camera.position))
+  return (
+    <mesh ref={mesh} renderOrder={-1000} frustumCulled={false}>
+      <sphereGeometry args={[300, 32, 16]} />
+      <shaderMaterial vertexShader={skyVertex} fragmentShader={skyFragment} uniforms={uniforms} fog side={THREE.BackSide} depthWrite={false} />
+    </mesh>
+  )
+}
 
 /**
  * Фонари. На площади аттракционов — два ряда по сторонам пути камеры
@@ -54,6 +91,8 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
   // брусок ≈ 0.24 × 0.12 м: у площади светлая плитка, у аллеи — красный кирпичик
   const plazaTex = useMemo(() => paversTexture([38, 35], 29), [])
   const alleyTex = useMemo(() => paversTexture([100, 4], 23), [])
+  const crownGeo = useMemo(() => crownGeometry(5, 5, 1), [])
+  const crownMat = useMemo(() => foliageMaterial({}), [])
 
   const trees = useMemo(() => {
     const r = mulberry(42)
@@ -204,11 +243,9 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
         <cylinderGeometry args={[0.95, 1, 1, 6]} />
         <meshStandardMaterial color="#cfccc2" roughness={1} />
       </instancedMesh>
-      <instancedMesh ref={crowns} args={[undefined, undefined, trees.length]}>
-        <icosahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial roughness={0.95} flatShading />
-      </instancedMesh>
+      <instancedMesh ref={crowns} args={[crownGeo, crownMat, trees.length]} />
 
+      <Sky />
       {/* луна */}
       <mesh position={[-60, 55, -160]}>
         <sphereGeometry args={[5, 32, 16]} />
@@ -216,8 +253,10 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
       </mesh>
       <Stars radius={180} depth={60} count={quality === 'high' ? 3000 : 1200} factor={5} saturation={0} fade speed={0.4} />
 
-      <Fireflies count={quality === 'high' ? 700 : 260} />
-      <Fireflies count={quality === 'high' ? 160 : 60} center={[17, 2.5, -82]} area={[26, 4, 30]} color="#ffd9a0" size={90} />
+      {/* редкие и мелкие: сотни крупных «светлячков» над городской площадью
+          выглядели как пятна на объективе, а не как вечер в парке */}
+      <Fireflies count={quality === 'high' ? 260 : 120} size={95} />
+      <Fireflies count={quality === 'high' ? 90 : 40} center={[17, 2.5, -82]} area={[26, 4, 30]} color="#ffd9a0" size={70} />
     </group>
   )
 }

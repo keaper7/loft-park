@@ -70,39 +70,49 @@ export function Preloader() {
           />
 
           <motion.div className="relative flex flex-col items-center" exit={{ opacity: 0, scale: 1.08 }} transition={{ duration: 0.6 }}>
-            <svg viewBox="0 0 900 180" className="w-[min(86vw,820px)] overflow-visible" role="img" aria-label="Loft Park">
-              <defs>
-                <filter id="neon-glow" x="-20%" y="-50%" width="140%" height="200%">
-                  <feGaussianBlur stdDeviation="6" result="b" />
-                  <feMerge>
-                    <feMergeNode in="b" />
-                    <feMergeNode in="b" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              <text
-                x="450"
-                y="128"
-                textAnchor="middle"
-                className="display"
-                style={{
-                  fontSize: 136,
-                  fill: lit ? '#fff1dc' : 'transparent',
-                  // У вариативного шрифта контуры букв перекрываются — обводка
-                  // после заливки рисует линии внутри глифов, поэтому гасим её
-                  stroke: lit ? 'transparent' : 'rgba(255,181,97,0.55)',
-                  strokeWidth: 1.6,
-                  strokeDasharray: 1400,
-                  strokeDashoffset: 1400 - (count / 100) * 1400,
-                  filter: lit ? 'url(#neon-glow)' : 'none',
-                  transition: 'fill .15s, stroke .15s',
-                  animation: lit ? 'flicker-on 1s linear both' : undefined,
-                }}
+            {/* Пока лампы «прогреваются» — SVG-контур, который прорисовывается
+                по счётчику. Загорается уже HTML-текст с неоновым text-shadow:
+                мягкое свечение без SVG-фильтра (размытие во весь экран в момент
+                старта 3D давало мигание), а толстые обводки-«ореолы» выглядели
+                дутыми буквами, а не светом */}
+            <div className="relative w-[min(86vw,820px)]">
+              <svg
+                viewBox="0 0 900 180"
+                className="block w-full overflow-visible"
+                role="img"
+                aria-label="Loft Park"
+                style={{ opacity: lit ? 0 : 1, transition: 'opacity .25s' }}
               >
-                LOFT PARK
-              </text>
-            </svg>
+                <text
+                  x="450"
+                  y="128"
+                  textAnchor="middle"
+                  className="display"
+                  style={{
+                    fontSize: 136,
+                    fill: 'transparent',
+                    // У вариативного шрифта контуры букв перекрываются — поэтому
+                    // только обводка, без заливки
+                    stroke: 'rgba(255,181,97,0.55)',
+                    strokeWidth: 1.6,
+                    strokeDasharray: 1400,
+                    strokeDashoffset: 1400 - (count / 100) * 1400,
+                  }}
+                >
+                  LOFT PARK
+                </text>
+              </svg>
+              {lit && (
+                <div
+                  aria-hidden="true"
+                  className="display neon absolute inset-0 flex items-center justify-center whitespace-nowrap"
+                  // 136 / 900 — тот же размер, что у SVG-текста в его viewBox
+                  style={{ fontSize: 'calc(min(86vw, 820px) * 0.1511)', animation: 'flicker-on 1s linear both' }}
+                >
+                  LOFT PARK
+                </div>
+              )}
+            </div>
             <div className="micro mt-6 flex w-[min(86vw,820px)] items-center justify-between text-[var(--dim-2)]">
               <span>Нальчик · ЦПКиО</span>
               <span className="tabular-nums text-amber">{String(count).padStart(3, '0')}</span>

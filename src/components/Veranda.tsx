@@ -41,7 +41,13 @@ function FrameArt({ i }: { i: number }) {
               const t = k / 10
               const x = -20 + 440 * t
               const yy = y + 180 * t * (1 - t)
-              return <circle key={k} cx={x} cy={yy + 8} r="6" fill="#ffc46b" className="art-twinkle" style={{ animationDelay: `${(k + r * 3) * 0.17}s`, filter: 'drop-shadow(0 0 10px #ffb561)' }} />
+              // ореол — второй круг, а не filter: drop-shadow на мерцающих элементах
+              return (
+                <g key={k} className="art-twinkle" style={{ animationDelay: `${(k + r * 3) * 0.17}s` }}>
+                  <circle cx={x} cy={yy + 8} r="15" fill="#ffb561" opacity="0.22" />
+                  <circle cx={x} cy={yy + 8} r="6" fill="#ffc46b" />
+                </g>
+              )
             })}
           </g>
         ))}

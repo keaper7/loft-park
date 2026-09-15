@@ -64,7 +64,7 @@ export function DJBooth() {
   const beamUniforms = useMemo(
     () =>
       ['#ffb561', '#ff3d8b', '#ffb561', '#ff3d8b'].map((c) => ({
-        uColor: { value: new THREE.Color(c).multiplyScalar(1.6) },
+        uColor: { value: new THREE.Color(c) },
         uOpacity: { value: 0.2 },
       })),
     [],
@@ -83,8 +83,9 @@ export function DJBooth() {
         b.rotation.x = 0.35 + Math.cos(t * 0.6 + i) * 0.2
       }
       const m = beamMats.current[i]
-      // лучи не должны заливать буквы на стене из мха
-      if (m) m.uniforms.uOpacity.value = 0.02 + near * 0.12
+      // Лучи — лёгкий намёк на вечеринку. Плотные конусы заливали розовым
+      // серебряные буквы на стене из мха и превращали зал в ночной клуб
+      if (m) m.uniforms.uOpacity.value = 0.004 + near * 0.016
     })
     if (neon.current) {
       const hue = fx.reduced ? 0.06 : 0.92 + Math.sin(t * 0.4) * 0.08
@@ -129,7 +130,8 @@ export function DJBooth() {
         <meshStandardMaterial color="#1a1a1c" metalness={0.6} roughness={0.4} />
       </mesh>
 
-      <pointLight position={[0, 2.4, -99]} color="#ff4f9a" intensity={6} distance={8} decay={1.5} />
+      {/* низко у пульта: розовый отсвет на полу и технике, а не на буквах */}
+      <pointLight position={[0, 1.4, -98.6]} color="#ff5c9e" intensity={2.5} distance={5} decay={1.5} />
 
       {/* лучи прожекторов */}
       {[-3, -1, 1, 3].map((x, i) => (

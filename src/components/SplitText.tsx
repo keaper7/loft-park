@@ -43,7 +43,9 @@ export function SplitText({
             return (
               <motion.span
                 key={ci}
-                className="inline-block will-change-transform"
+                // без will-change: сотни букв навсегда оставались отдельными
+                // GPU-слоями, и под нагрузкой браузер выгружал их плитки
+                className="inline-block"
                 variants={{
                   hidden: reduced ? { opacity: 0 } : { y: '110%', rotate: 8, opacity: 0 },
                   show: { y: '0%', rotate: 0, opacity: 1 },

@@ -15,7 +15,6 @@ import {
   herringboneTexture,
   mossTexture,
   planksTexture,
-  slatsTexture,
 } from './textures'
 import { buildWord, useEmblem } from './LoftSign'
 import { DJBooth } from './DJBooth'
@@ -28,7 +27,10 @@ import { crownGeometry, foliageMaterial, puffGeometry } from './foliage'
  *   штукатурки, по его кромке — светодиодная лента с жёлто-зелёной засветкой;
  * - задняя стена — живой мох с серебристыми буквами LOFT [лист] PARK,
  *   под ним грубые деревянные панели, над буквами трек со спотами и
- *   чугунная люстра-клетка с лампами Эдисона;
+ *   чугунная люстра-клетка с лампами Эдисона; прямо под буквами — длинный
+ *   серый диван с подушками и столами «ёлочкой», DJ-пульт — в углу;
+ * - по залу — плотная посадка: столы на четверых с бирюзовыми и пудровыми
+ *   креслами, общий стол из трёх сдвинутых столов для большой компании;
  * - вдоль стен — окна с длинными шторами и кирпичные колонны; под окнами
  *   бежевые диваны с узорными подушками, столы «ёлочкой» на чёрных ножках,
  *   бирюзовые и пудровые кресла-«ракушки» на тонких ножках;
@@ -104,12 +106,8 @@ export function Hall() {
     const herring = herringboneTexture()
     const longHerring = herring.clone()
     longHerring.wrapS = longHerring.wrapT = THREE.RepeatWrapping
-    longHerring.repeat.set(9, 1.4)
+    longHerring.repeat.set(3, 0.9)
     longHerring.needsUpdate = true
-    // вертикальные рейки «барабанов»: горизонтальная текстура, повёрнутая на 90°
-    const drum = slatsTexture([10, 1], true)
-    drum.center.set(0.5, 0.5)
-    drum.rotation = Math.PI / 2
     return {
       floor: planksTexture([5, 7], true),
       wall: planksTexture([5, 1.4], false),
@@ -122,7 +120,6 @@ export function Hall() {
       screen: carvedScreenTexture(),
       herring,
       longHerring,
-      drum,
     }
   }, [])
 
@@ -143,6 +140,9 @@ export function Hall() {
       legs: chairLegsGeometry(),
       // стол на двух наклонных опорах-трапециях
       tableLegs: mergeGeometries([-1, 1].map((s) => new THREE.BoxGeometry(0.05, 0.72, 0.55).translate(s * 0.42, 0.36, 0)))!,
+      // секция общего стола: четыре тонкие стальные ножки по углам — на крупных
+      // планах блюд опоры-трапеции читались тёмными плитами под столешницей
+      sectionLegs: mergeGeometries([-1, 1].flatMap((sx) => [-1, 1].map((sz) => new THREE.BoxGeometry(0.045, 0.71, 0.045).translate(sx * 1.66, 0.355, sz * 0.6))))!,
       window: curtainGeometry(0.9, 3.1),
       frontCurtain: curtainGeometry(1.6, H.h - 0.1, 14),
     }),
@@ -168,8 +168,8 @@ export function Hall() {
       soffit: new THREE.MeshStandardMaterial({ map: tex.plaster, color: '#8d8b86', roughness: 0.9 }),
       leather: new THREE.MeshStandardMaterial({ color: '#b8672c', roughness: 0.45 }),
       shelfGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2, 0.9), toneMapped: false }),
-      drum: new THREE.MeshStandardMaterial({ map: tex.drum, color: '#d59a5c', alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.6 }),
-      drumGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.55, 0.7), toneMapped: false }),
+      veneer: new THREE.MeshStandardMaterial({ color: '#b27a45', emissive: '#6a3a12', emissiveIntensity: 0.55, side: THREE.DoubleSide, roughness: 0.6 }),
+      drumGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.0, 1.3, 0.6), toneMapped: false }),
       amber: new THREE.MeshStandardMaterial({ color: '#d99a3a', emissive: '#a05a10', emissiveIntensity: 1.3, roughness: 0.1, transparent: true, opacity: 0.6, depthWrite: false }),
       greenGlass: new THREE.MeshStandardMaterial({ color: '#7ab86a', emissive: '#2f7a2a', emissiveIntensity: 1.1, roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false }),
       curtain: new THREE.MeshStandardMaterial({ color: '#c08a58', roughness: 0.9, side: THREE.DoubleSide }),
@@ -229,17 +229,24 @@ export function Hall() {
       chair(tx + (left ? 0.95 : -0.95), z - 0.36, left ? -Math.PI / 2 : Math.PI / 2)
       chair(tx + (left ? 0.95 : -0.95), z + 0.36, left ? -Math.PI / 2 : Math.PI / 2)
     }
-    // длинный серый диван у стены из мха, слева от DJ
-    const bx = -9.5
+    // длинный серый диван под буквами на мху — как на фото стены
+    const bx = 0
     const bz = H.zBack + 0.55
     out.longSofas.push(mat([bx, 0, bz], [1, 1, 1], 0))
     pillows(bx, bz, 0, [-1.4, -0.3, 1.2])
-    table(bx - 0.7, bz + 1.2, 0)
-    table(bx + 1.0, bz + 1.2, 0)
+    table(bx - 0.9, bz + 1.2, 0)
+    table(bx + 0.9, bz + 1.2, 0)
     chair(bx - 0.9, bz + 2.15, Math.PI)
-    chair(bx + 1.2, bz + 2.15, Math.PI)
-    // кресла у общего стола — лицом к камере на блюдах
-    for (const x of [-4.8, -2.4, 0, 2.4, 4.8]) chair(x, TABLE_Z - 1.05, 0)
+    chair(bx + 0.9, bz + 2.15, Math.PI)
+    // кресла у общего стола — с дальней стороны, лицом к камере на блюдах
+    for (const x of [-4.5, -2.7, -0.9, 0.9, 2.7, 4.5]) chair(x, TABLE_Z - 0.85, 0)
+    // столы на четверых между входом и общим столом. Ниже пролётов камеры
+    // 3 → 4 и 6 → 7 (там камера на высоте ≈ 1.8 м) и позади кадров с блюдами
+    for (const x of [-4.6, -1.6, 1.4]) {
+      table(x, -89, 0)
+      chair(x, -89.75, 0)
+      chair(x, -88.25, Math.PI)
+    }
     return out
   }, [H.x0, H.x1, H.zBack])
 
@@ -274,8 +281,10 @@ export function Hall() {
         let t = -w / 2 + 0.08
         while (t < w / 2 - 0.1) {
           const along = (v: number) => (alongZ ? [cx + (r() - 0.5) * d * 0.3, cz + v] : [cx + v, cz + (r() - 0.5) * d * 0.3])
-          const kind = barShelf ? 0 : Math.floor(r() * 4)
-          if (kind === 0 || kind === 1) {
+          // на фото стеллажи — это зелень и зелёные бутылки, книг немного
+          const roll = r()
+          const kind = barShelf ? 0 : roll < 0.42 ? 0 : roll < 0.62 ? 2 : 3
+          if (kind === 0) {
             // ряд бутылок
             const n = 2 + Math.floor(r() * 4)
             for (let i = 0; i < n && t < w / 2 - 0.1; i++, t += 0.1) {
@@ -368,7 +377,8 @@ export function Hall() {
     <group>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, cz]}>
         <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial map={tex.floor} color="#a39180" roughness={0.55} />
+        {/* серо-коричневая плитка под дерево, как на фото зала */}
+        <meshStandardMaterial map={tex.floor} color="#8f857b" roughness={0.55} />
       </mesh>
 
       {/* потолок: тёмно-зелёный короб, серый опущенный край, LED-лента и засветка */}
@@ -538,15 +548,19 @@ export function Hall() {
         ))}
       </group>
 
-      {/* общий стол для трёх блюд */}
-      <mesh position={[0, 1.0, TABLE_Z]}>
-        <boxGeometry args={[12, 0.08, 1.8]} />
-        <meshStandardMaterial map={tex.longHerring} roughness={0.5} />
-      </mesh>
-      {[-5.6, 5.6].map((x) => (
-        <mesh key={x} position={[x, 0.5, TABLE_Z]} material={steel}>
-          <boxGeometry args={[0.08, 1, 1.4]} />
-        </mesh>
+      {/* Общий стол для трёх блюд: три стола «ёлочкой», сдвинутых в ряд для
+          большой компании, обычной обеденной высоты. Прежний стол-«подиум»
+          высотой в метр на глухих чёрных опорах рядом с креслами выглядел
+          барной стойкой. Блюдо на каждом столе по центру (x = −3.6, 0, 3.6) */}
+      {[-3.6, 0, 3.6].map((x) => (
+        <group key={x} position={[x, 0, TABLE_Z]}>
+          <mesh position={[0, 0.74, 0]}>
+            {/* глубина 1.4: доска с хачапури не свисает с края */}
+            <boxGeometry args={[3.6, 0.06, 1.4]} />
+            <meshStandardMaterial map={tex.longHerring} roughness={0.5} />
+          </mesh>
+          <mesh geometry={geos.sectionLegs} material={steel} />
+        </group>
       ))}
 
       <Instances items={furniture.sofas} geometry={geos.sofa} material={mats.fabric} colors={furniture.sofaColors} />
@@ -558,19 +572,22 @@ export function Hall() {
       <Instances items={furniture.chairLegs} geometry={geos.legs} material={steel} />
 
       {/* деревянные «барабаны» из реек */}
+      {/* Сплошной барабан из шпона, свет — только снизу и тёплым отсветом
+          сквозь тонкое дерево. Прежние рейки с просветами давали две белые
+          светящиеся щели вместо абажура */}
       {drums.map(([x, z]) => (
         <group key={`${x}${z}`} position={[x, 2.85, z]}>
           <mesh position={[0, 0.45, 0]} material={mats.wire}>
             <cylinderGeometry args={[0.008, 0.008, 0.6, 3]} />
           </mesh>
-          <mesh material={mats.drum}>
-            <cylinderGeometry args={[0.55, 0.55, 0.32, 36, 1, true]} />
+          <mesh material={mats.veneer}>
+            <cylinderGeometry args={[0.6, 0.6, 0.3, 40, 1, true]} />
           </mesh>
-          <mesh material={mats.drumGlow}>
-            <cylinderGeometry args={[0.47, 0.47, 0.26, 24, 1, true]} />
+          <mesh position={[0, 0.15, 0]} rotation-x={-Math.PI / 2} material={mats.darkWood}>
+            <circleGeometry args={[0.6, 40]} />
           </mesh>
-          <mesh position={[0, -0.12, 0]} rotation-x={Math.PI / 2} material={mats.drumGlow}>
-            <circleGeometry args={[0.5, 24]} />
+          <mesh position={[0, -0.13, 0]} rotation-x={Math.PI / 2} material={mats.drumGlow}>
+            <circleGeometry args={[0.56, 40]} />
           </mesh>
         </group>
       ))}
@@ -644,7 +661,7 @@ export function Hall() {
       {[
         [H.x0 + 0.8, H.zFront - 0.9],
         [H.x1 - 0.8, H.zFront - 0.9],
-        [-6.4, H.zBack + 0.7],
+        [-11, H.zBack + 0.7],
       ].map(([x, z]) => (
         <group key={`${x}${z}`} position={[x, 0, z]}>
           <mesh position={[0, 0.45, 0]}>
@@ -668,7 +685,10 @@ export function Hall() {
       <pointLight position={[-7.5, 2.7, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
       <pointLight position={[8.4, 2.6, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
 
-      <DJBooth />
+      {/* DJ-пульт — в углу у стены из мха: центр под буквами занят диваном */}
+      <group position={[-6.4, 0, 0]}>
+        <DJBooth />
+      </group>
 
       <group ref={beacon} position={[0, H.h + 0.5, cz]} visible={false}>
         <mesh position={[0, 6, 0]}>

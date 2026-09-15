@@ -17,9 +17,9 @@ const eqFragment = /* glsl */ `
     float id = floor(vUv.x * bars);
     float fx = fract(vUv.x * bars);
     float h = 0.15 + 0.85 * abs(sin(uTime * (1.2 + mod(id * 1.7, 3.0)) + id * 0.9)) * (0.55 + 0.45 * sin(uTime * 0.7 + id));
-    float on = step(vUv.y, h) * step(0.18, fx) * step(fx, 0.82) * step(0.3, fract(vUv.y * 12.0));
+    float on = step(vUv.y, h) * step(0.18, fx) * step(fx, 0.82) * step(0.3, fract(vUv.y * 4.0));
     vec3 col = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.18, 0.5), vUv.y);
-    gl_FragColor = vec4(col * on * 2.6 + vec3(0.015), 1.0);
+    gl_FragColor = vec4(col * on * 1.5 + vec3(0.015), 1.0);
   }
 `
 const eqVertex = /* glsl */ `
@@ -100,8 +100,9 @@ export function DJBooth() {
         <boxGeometry args={[4, 1.1, 1.2]} />
         <meshStandardMaterial color="#121214" roughness={0.6} metalness={0.4} />
       </mesh>
-      <mesh position={[0, 0.55, Z + 0.61]}>
-        <planeGeometry args={[3.8, 0.9]} />
+      {/* узкая полоса индикатора под столешницей, а не светящаяся стена во весь фасад */}
+      <mesh position={[0, 0.92, Z + 0.61]}>
+        <planeGeometry args={[3.8, 0.24]} />
         <shaderMaterial ref={eq} vertexShader={eqVertex} fragmentShader={eqFragment} uniforms={eqUniforms} toneMapped={false} />
       </mesh>
       {[-1.05, 1.05].map((x, i) => (

@@ -24,7 +24,8 @@ type Part = {
   fixed?: boolean
 }
 
-const TABLE_Y = 1.04
+// верх общего стола в зале (Hall.tsx): обычная обеденная высота
+const TABLE_Y = 0.77
 
 function seeded(seed: number) {
   let s = seed

@@ -6,7 +6,7 @@ import { Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { glowTexture, paversTexture } from './textures'
 import { Fireflies } from './Fireflies'
-import { ALLEY, PLAZA } from './layout'
+import { ALLEY, PLAZA, RIDES } from './layout'
 import { crownGeometry, foliageMaterial } from './foliage'
 
 const skyVertex = /* glsl */ `
@@ -109,6 +109,7 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
       if (x > PLAZA.x0 + 3 && x < PLAZA.x1 - 3 && z < PLAZA.zNear - 3 && z > PLAZA.zFar) continue // площадь аттракционов
       if (z < ALLEY.zNear + 4 && z > ALLEY.zFar - 3) continue // аллея и ряд вдоль неё
       if (x > -22 && x < 25 && z < -60 && z > -106) continue // площадка у лофта, терраса, зал, шатёр
+      if (Math.hypot(x - RIDES.swing.x, z - RIDES.swing.z) < 9) continue // цепочная карусель за аллеей
       out.push({ x, z, s: 0.8 + r() * 1.3, h: 2.2 + r() * 2.8 })
     }
     return out

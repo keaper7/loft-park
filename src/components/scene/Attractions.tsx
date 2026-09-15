@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { fx } from './fx'
-import { KIOSKS, RIDES } from './layout'
+import { KIOSKS, PAVILIONS, RIDES } from './layout'
 import { Instances, mat } from './instancing'
 import { glowTexture } from './textures'
 
@@ -539,7 +539,10 @@ function ElephantFountain({ quality }: { quality: 'high' | 'low' }) {
   )
 }
 
-// ─────────────────────────── киоски ───────────────────────────
+// ─────────────────────────── киоски и павильоны ───────────────────────────
+
+/** Сторона квадратного основания крыши: конус радиуса 2.2, повёрнутый ребром к углам */
+const ROOF_SIDE = 2.2 * Math.SQRT2
 
 function Kiosks() {
   const geos = useMemo(
@@ -552,31 +555,70 @@ function Kiosks() {
   )
   const mats = useMemo(
     () => ({
-      body: new THREE.MeshStandardMaterial({ color: '#ebe6dc', roughness: 0.7 }),
-      roof: new THREE.MeshStandardMaterial({ color: '#b8262c', roughness: 0.6 }),
+      // цвет стен — у каждого здания свой (инстансы)
+      body: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.7 }),
+      // цвет крыши — у каждого здания свой (инстансы)
+      roof: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 }),
       window: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.6, 0.9), toneMapped: false }),
+      door: new THREE.MeshStandardMaterial({ color: '#3a2c22', roughness: 0.6 }),
     }),
     [],
   )
   const items = useMemo(() => {
     const bodies: THREE.Matrix4[] = []
+    const bodyColors: THREE.Color[] = []
     const roofs: THREE.Matrix4[] = []
+    const roofColors: THREE.Color[] = []
     const windows: THREE.Matrix4[] = []
+    const awnings: THREE.Matrix4[] = []
+    const awningColors: THREE.Color[] = []
+    const doors: THREE.Matrix4[] = []
+    const glows: [number, number, number][] = []
+    const red = new THREE.Color('#b8262c')
+    const kioskWall = new THREE.Color('#ebe6dc')
+    const pavilionWall = new THREE.Color('#b9ad9c')
     KIOSKS.forEach(([x, z, ry]) => {
       bodies.push(mat([x, 1.25, z], [2.8, 2.5, 2.2], ry))
+      bodyColors.push(kioskWall)
       roofs.push(mat([x, 2.95, z], [1, 1, 0.8], ry))
+      roofColors.push(red)
       // окно выдачи на лицевой стороне (локальная +z)
       windows.push(mat([x + Math.sin(ry) * 1.11, 1.5, z + Math.cos(ry) * 1.11], [2, 0.85, 0.02], ry))
+      glows.push([x + Math.sin(ry) * 2.2, z + Math.cos(ry) * 2.2, 5])
     })
-    return { bodies, roofs, windows }
+    // павильоны: витрины — на фасаде, обращённом к пути гостя (x = 0)
+    PAVILIONS.forEach(({ x, z, w, d, h, roof }) => {
+      const side = -Math.sign(x)
+      bodies.push(mat([x, h / 2, z], [w, h, d]))
+      bodyColors.push(pavilionWall)
+      // крыша круче, чем у киоска: у низкого длинного павильона с земли
+      // иначе не видно красного ската — он читался белой коробкой
+      roofs.push(mat([x, h + 0.65, z], [(w + 0.8) / ROOF_SIDE, 1.45, (d + 0.8) / ROOF_SIDE]))
+      roofColors.push(new THREE.Color(roof))
+      // Фасад: окна-витрины и двери через одно, над ними козырёк в цвет крыши.
+      // Сплошная полоса светилась как лайтбокс, голая стена — как контейнер
+      const n = Math.max(2, Math.round(d / 3.5))
+      const face = x + side * (w / 2 + 0.01)
+      for (let k = 0; k < n; k++) {
+        const cz = z - d / 2 + (d / n) * (k + 0.5)
+        if (k % 2 === 1 && n > 2) doors.push(mat([face, 1.05, cz], [0.03, 2.1, 1]))
+        else windows.push(mat([face, 1.45, cz], [0.02, 0.95, (d / n) * 0.6]))
+      }
+      awnings.push(mat([x + side * (w / 2 + 0.35), 2.45, z], [0.7, 0.05, d * 0.94], 0, 0))
+      awningColors.push(new THREE.Color(roof))
+      glows.push([x + side * (w / 2 + 1.6), z, Math.min(d, 9)])
+    })
+    return { bodies, bodyColors, roofs, roofColors, windows, awnings, awningColors, doors, glows }
   }, [])
   return (
     <group>
-      <Instances items={items.bodies} geometry={geos.box} material={mats.body} />
-      <Instances items={items.roofs} geometry={geos.roof} material={mats.roof} />
+      <Instances items={items.bodies} geometry={geos.box} material={mats.body} colors={items.bodyColors} />
+      <Instances items={items.roofs} geometry={geos.roof} material={mats.roof} colors={items.roofColors} />
       <Instances items={items.windows} geometry={geos.box} material={mats.window} />
-      {KIOSKS.map(([x, z, ry]) => (
-        <Glow key={`${x}${z}`} x={x + Math.sin(ry) * 2.2} z={z + Math.cos(ry) * 2.2} size={5} opacity={0.4} />
+      <Instances items={items.awnings} geometry={geos.box} material={mats.roof} colors={items.awningColors} />
+      <Instances items={items.doors} geometry={geos.box} material={mats.door} />
+      {items.glows.map(([x, z, size]) => (
+        <Glow key={`${x}${z}`} x={x} z={z} size={size} opacity={0.4} />
       ))}
     </group>
   )
@@ -588,6 +630,7 @@ export function Attractions({ quality }: { quality: 'high' | 'low' }) {
       <FerrisWheel />
       <KiddieCarousel {...RIDES.carouselA} speed={0.32} />
       <KiddieCarousel {...RIDES.carouselB} speed={-0.4} />
+      <KiddieCarousel {...RIDES.carouselC} speed={0.36} />
       <BumperBoats />
       <ElephantFountain quality={quality} />
       <Kiosks />

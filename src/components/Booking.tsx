@@ -2,9 +2,9 @@
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { booking, contact } from '@/content'
+import { booking } from '@/content'
 import { rub, trayCount, trayTotal, useStore } from '@/lib/store'
-import { bookingMessage, whatsappLink } from '@/lib/whatsapp'
+import { bookingMessage } from '@/lib/whatsapp'
 import { moscowNow } from '@/lib/openHours'
 import { SplitText } from './SplitText'
 
@@ -95,16 +95,11 @@ export function Booking() {
       <div className="scrim mx-auto grid max-w-[1320px] gap-10 rounded-[28px] lg:grid-cols-[1fr_1.25fr] lg:items-center">
         <div className="min-w-0">
           <p className="micro mb-4 text-amber">{booking.eyebrow}</p>
-          {/* «Забронировать» — 13 широких букв Unbounded без переноса: размер
-              подобран так, чтобы слово влезало в левую колонку от 1024px */}
-          <SplitText text={booking.title} className="display text-[clamp(30px,3.4vw,66px)]" />
+          {/* «Забронировать» — 13 широких букв Unbounded, которые SplitText не
+              переносит. Нижняя граница 24px, а не 30px: на экране 320px слово
+              при 30px занимало 323px в колонке шириной 280 и вылезало за край */}
+          <SplitText text={booking.title} className="display text-[clamp(24px,3.4vw,66px)]" />
           <p className="mt-6 max-w-[440px] leading-relaxed text-[var(--dim)]">{booking.text}</p>
-          <div className="mt-8 flex flex-col gap-2 text-[var(--dim)]">
-            <span className="micro text-[10px] text-[var(--dim-2)]">Или напрямую</span>
-            <a href={contact.phoneHref} className="display text-xl text-cream" data-cursor="Звонок">
-              {contact.phone}
-            </a>
-          </div>
         </div>
 
         <div className="min-w-0 [perspective:1600px]">
@@ -238,16 +233,16 @@ export function Booking() {
               <pre className="no-scrollbar max-h-[260px] flex-1 overflow-auto whitespace-pre-wrap rounded-2xl bg-ink/60 p-5 font-sans text-sm leading-relaxed text-[var(--dim)]" data-lenis-prevent>
                 {message}
               </pre>
-              <a
-                href={whatsappLink(message)}
-                target="_blank"
-                rel="noreferrer"
-                data-cursor="WhatsApp"
-                className="mt-6 flex items-center justify-center gap-3 rounded-full bg-[#25d366] py-4 font-semibold text-ink"
-              >
-                Отправить в WhatsApp
-              </a>
-              <p className="mt-3 text-center text-xs text-[var(--dim-2)]">Откроется чат администратора {contact.whatsappLabel} с готовым текстом</p>
+              {/* Кнопки отправки нет намеренно: сайт не согласован с рестораном,
+                  и живая ссылка на wa.me означала бы, что по клику из портфолио
+                  реальным людям в WhatsApp приходят просьбы забронировать стол.
+                  Карточка показывает готовый текст — этого достаточно, чтобы
+                  видеть, как работал бы интерфейс, не создавая рабочий канал. */}
+              <div className="mt-6 flex items-center justify-center gap-3 rounded-full border border-dashed border-[var(--hair-strong)] py-4 text-center text-sm text-[var(--dim)]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber" />
+                Текст выше — то, что ушло бы администратору
+              </div>
+              <p className="mt-3 text-center text-xs text-[var(--dim-2)]">Это концепт-проект: сообщение никуда не отправляется</p>
             </div>
           </motion.div>
         </div>

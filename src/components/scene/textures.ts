@@ -100,6 +100,24 @@ export function glowTexture() {
   return toTexture(c)
 }
 
+/**
+ * Мягкая тень под мебелью: чёрное пятно, растворяющееся к краям. Настоящие
+ * карты теней от десятка ламп сцену бы не потянули, а без затемнения под
+ * ножками мебель «висела» над полом.
+ */
+export function shadowTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grd.addColorStop(0, 'rgba(0,0,0,0.6)')
+  grd.addColorStop(0.5, 'rgba(0,0,0,0.3)')
+  grd.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = grd
+  g.fillRect(0, 0, 128, 128)
+  return toTexture(c)
+}
+
 /** Винил: дорожки, блик и янтарный центр с надписью */
 export function vinylTexture() {
   const c = document.createElement('canvas')

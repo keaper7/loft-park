@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import { brand, contact, nav } from '@/content'
+import { brand, nav } from '@/content'
 import { useStore } from '@/lib/store'
 import { getLenis } from '@/lib/scroll'
 import { MagneticButton } from './MagneticButton'
@@ -113,7 +113,6 @@ export function Nav() {
             </nav>
             <div className="flex flex-col gap-3 text-[var(--dim)]">
               <OpenStatus className="micro" />
-              <a href={contact.phoneHref} className="text-lg text-cream">{contact.phone}</a>
               <SoundToggle withLabel />
             </div>
           </motion.div>

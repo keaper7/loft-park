@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useStore as useThreeStore } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, SSAO, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ShaderPass, ToneMappingMode, type BloomEffect } from 'postprocessing'
 import { useStore } from '@/lib/store'
 import { CameraRig } from './CameraRig'
@@ -68,8 +68,26 @@ function Effects() {
     if (bloom.current) bloom.current.intensity = fx.bloom
   })
   return (
-    <EffectComposer multisampling={0}>
+    // enableNormalPass — для SSAO: он читает нормали сцены
+    <EffectComposer multisampling={0} enableNormalPass>
       <primitive object={sanitize} dispose={null} />
+      {/* Мягкое затенение в углах, стыках и под мебелью. Настоящие карты теней
+          от десятка точечных ламп — это по шесть проходов на лампу; SSAO даёт
+          главное: интерьер перестаёт выглядеть «вырезанным из бумаги».
+          Работает только вблизи (worldDistance), парк и небо не трогает */}
+      <SSAO
+        samples={16}
+        rings={5}
+        radius={0.055}
+        intensity={1.9}
+        bias={0.035}
+        luminanceInfluence={0.5}
+        resolutionScale={0.5}
+        worldDistanceThreshold={26}
+        worldDistanceFalloff={6}
+        worldProximityThreshold={0.8}
+        worldProximityFalloff={0.3}
+      />
       <Bloom ref={bloom} mipmapBlur intensity={1} luminanceThreshold={0.95} luminanceSmoothing={0.2} radius={0.75} />
       <Vignette offset={0.25} darkness={0.75} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

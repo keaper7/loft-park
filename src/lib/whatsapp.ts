@@ -1,4 +1,3 @@
-import { contact } from '@/content'
 import { rub, trayTotal, type TrayItem } from './store'
 
 export type BookingData = {
@@ -14,9 +13,10 @@ export type BookingData = {
 const dateFmt = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 
 /**
- * Бронь без бэкенда: сайт статический, а администратор ресторана и так
- * на связи в WhatsApp. Собираем читаемое сообщение и открываем wa.me —
- * гостю остаётся нажать «Отправить», заявка сразу у живого человека.
+ * Собирает читаемый текст брони — так, как он выглядел бы в WhatsApp
+ * администратора. Сайт концептуальный и с реальным Loft Park не
+ * согласован, поэтому никуда не отправляется: это витрина интерфейса,
+ * а не рабочий канал бронирования. См. contact в content.ts.
  */
 export function bookingMessage(d: BookingData): string {
   const lines = [
@@ -35,6 +35,3 @@ export function bookingMessage(d: BookingData): string {
   }
   return lines.join('\n')
 }
-
-export const whatsappLink = (text: string) =>
-  `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(text)}`

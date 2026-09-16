@@ -3,10 +3,11 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { POLES, SQUARE, TERRACE, TREES } from './layout'
-import { concreteTexture, paversTexture, planksTexture, slatsTexture, weaveTexture } from './textures'
+import { concreteTexture, herringboneTexture, paversTexture, planksTexture, shadowTexture, slatsTexture, weaveTexture } from './textures'
 import { Instances, mat, seeded } from './instancing'
 import { crownGeometry, foliageMaterial, puffGeometry } from './foliage'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 
 /**
  * Площадь и терраса Loft Park — по фотографиям гостей:
@@ -160,6 +161,25 @@ function hedgeGeometry() {
   return g
 }
 
+/**
+ * Диван-скамья веранды: деревянная рама с подлокотниками и мягкие подушки.
+ * Спинка — у локального −z. На фото такие скамьи стоят вдоль всего настила
+ * спинками к ящикам с зеленью, столы «ёлочкой» — перед ними.
+ */
+function benchGeometries(w: number) {
+  return {
+    frame: mergeGeometries([
+      new RoundedBoxGeometry(w, 0.32, 0.9, 2, 0.04).translate(0, 0.16, 0),
+      new RoundedBoxGeometry(0.13, 0.6, 0.9, 2, 0.04).translate(-w / 2 + 0.065, 0.3, 0),
+      new RoundedBoxGeometry(0.13, 0.6, 0.9, 2, 0.04).translate(w / 2 - 0.065, 0.3, 0),
+    ])!,
+    cushion: mergeGeometries([
+      new RoundedBoxGeometry(w - 0.22, 0.22, 0.8, 3, 0.08).translate(0, 0.43, 0.04),
+      new RoundedBoxGeometry(w - 0.22, 0.52, 0.22, 3, 0.08).translate(0, 0.72, -0.31),
+    ])!,
+  }
+}
+
 /** Штора со складками */
 function curtainGeometry(w: number, h: number) {
   const g = new THREE.PlaneGeometry(w, h, 24, 1)
@@ -170,6 +190,14 @@ function curtainGeometry(w: number, h: number) {
 }
 
 const MODULE = 2
+
+/**
+ * Ящики с зеленью вдоль прохода. Проход между ними и есть дорога в зал:
+ * узкий, как на фото, — гость идёт коридором из зелени, а не по пустому
+ * настилу. Левый ящик отодвинут дальше правого: мимо него проходит камера
+ * на отрезке 3 → 4 (keyframes.ts), ей нужен запас в метр.
+ */
+const RAIL_X = [-4.2, 2.4]
 
 export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
   const T = TERRACE
@@ -184,6 +212,10 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       screen: slatsTexture([3, 2], true),
       concrete: concreteTexture(),
       weave: weaveTexture([7, 2]),
+      // столы веранды — такие же «ёлочкой», как в зале
+      herring: herringboneTexture(),
+      ceiling: planksTexture([4, 3], true),
+      shadow: shadowTexture(),
     }),
     [],
   )
@@ -193,11 +225,27 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       box: new THREE.BoxGeometry(1, 1, 1),
       hedge: hedgeGeometry(),
       pleat: pleatGeometry(2.34, 2.74),
+      // дощатый потолок в глубине веранды: полотно тента переходит в крышу
+      panel: new THREE.PlaneGeometry(2.4, 2.8).rotateX(Math.PI / 2),
       chair: rattanChairGeometries(),
       leg: new THREE.CylinderGeometry(0.035, 0.035, 1, 6),
       bloom: puffGeometry(),
       smallCrown: crownGeometry(31, 4, 1),
       curtain: curtainGeometry(1.3, T.roofY - 0.1),
+      bench: benchGeometries(2.2),
+      pillow: new RoundedBoxGeometry(0.44, 0.4, 0.15, 3, 0.06),
+      top: new RoundedBoxGeometry(1.4, 0.06, 0.9, 3, 0.02),
+      shadow: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+      // подвесные кашпо: горшок на шнуре и свисающие плети
+      pot: new THREE.CylinderGeometry(0.21, 0.15, 0.2, 12),
+      cord: new THREE.CylinderGeometry(0.008, 0.008, 1, 3),
+      // сервировка: стакан тонкой стенкой и свеча
+      glass: mergeGeometries([
+        new THREE.CylinderGeometry(0.036, 0.03, 0.12, 14, 1, true).translate(0, 0.06, 0),
+        new THREE.CylinderGeometry(0.03, 0.03, 0.012, 14).translate(0, 0.006, 0),
+      ])!,
+      candle: new THREE.CylinderGeometry(0.03, 0.03, 0.1, 10).translate(0, 0.05, 0),
+      flame: new THREE.SphereGeometry(0.016, 8, 6).translate(0, 0.115, 0),
     }),
     [T.roofY],
   )
@@ -219,26 +267,45 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       cushion: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
       bloom: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }),
       leafGreen: foliageMaterial({ color: '#5a8f48' }),
+      // Белая листва под цвет инстанса: цвет инстанса умножается на цвет
+      // материала, и зелёный по зелёному давал почти чёрные кусты
+      leafTint: foliageMaterial({ color: '#ffffff' }),
       leafRed: foliageMaterial({ color: '#8a4432' }),
       red: new THREE.MeshStandardMaterial({ color: '#a4151f', roughness: 0.85, side: THREE.DoubleSide }),
       redSeat: new THREE.MeshStandardMaterial({ color: '#b5202a', roughness: 0.7 }),
       sofa: new THREE.MeshStandardMaterial({ color: '#8d8b86', roughness: 0.95 }),
       frameWood: new THREE.MeshStandardMaterial({ color: '#9a6436', roughness: 0.6 }),
       orange: new THREE.MeshStandardMaterial({ color: '#e0803f', roughness: 0.9 }),
+      ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, color: '#b08a5e', roughness: 0.85, side: THREE.DoubleSide }),
+      herring: new THREE.MeshStandardMaterial({ map: tex.herring, roughness: 0.5 }),
+      benchWood: new THREE.MeshStandardMaterial({ color: '#7a5636', roughness: 0.75 }),
+      benchSeat: new THREE.MeshStandardMaterial({ color: '#8f8b83', roughness: 0.95 }),
+      pot: new THREE.MeshStandardMaterial({ color: '#2b2722', roughness: 0.85 }),
+      soil: new THREE.MeshStandardMaterial({ color: '#241a12', roughness: 1 }),
+      glass: new THREE.MeshStandardMaterial({ color: '#dfe8ea', roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }),
+      wax: new THREE.MeshStandardMaterial({ color: '#efe6d2', roughness: 0.8 }),
+      flame: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.4, 1.3), toneMapped: false }),
+      contact: new THREE.MeshBasicMaterial({ map: tex.shadow, transparent: true, depthWrite: false }),
     }),
     [tex],
   )
 
-  // ── маркизы: панели, кроме тех, сквозь которые растут деревья ──
-  const awning = useMemo(() => {
-    const cells: THREE.Matrix4[] = []
+  /**
+   * Потолок веранды: у фасада — тентовые полотна складками, в глубине
+   * тёплый дощатый потолок. На фото так и есть: выдвижной навес над
+   * первым рядом переходит в деревянную крышу над проходом и залом.
+   * Панелей нет там, где сквозь крышу растут деревья.
+   */
+  const roof = useMemo(() => {
+    const pleat: THREE.Matrix4[] = []
+    const wood: THREE.Matrix4[] = []
     for (let x = T.x0 + 1.2; x < T.x1; x += 2.4) {
       for (let z = T.zFront - 1.4; z > T.zBack; z -= 2.8) {
         if (TREES.some((t) => t.planter && Math.abs(t.x - x) < 1.9 && Math.abs(t.z - z) < 2)) continue
-        cells.push(mat([x, T.roofY, z]))
+        ;(z > -78 ? pleat : wood).push(mat([x, T.roofY, z]))
       }
     }
-    return cells
+    return { pleat, wood }
   }, [T])
 
   // ── фасад и правый бок: рама из стоек, ящики с кустарником ──
@@ -278,34 +345,145 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
     return { boxes, hedges, hedgeColors, posts, rails }
   }, [T])
 
-  // ── столы и кресла-бочонки ──
+  /**
+   * Посадка веранды по фотографиям: вдоль прохода стоят скамьи спинками к
+   * ящикам с зеленью, перед ними столы «ёлочкой» и плетёные кресла; вдоль
+   * левой перегородки — отдельный ряд столов. Проход по центру (между
+   * ящиками) остаётся пустым: через веранду проходят в зал, и путь камеры
+   * 2 → 3 → 4 идёт именно по нему.
+   */
   const dining = useMemo(() => {
     const r = seeded(9)
-    // Столы проверены против пути камеры (keyframes.ts), кашпо деревьев и лаунжа
-    const tables: [number, number][] = [
-      [-10.2, -76.6],
-      [-4.6, -75.4],
-      [-10.2, -80.6],
-      [-10, -84.6],
-      [2.6, -77.2],
-      [3, -81.2],
-      [0.2, -84.4],
-    ]
+    const out = {
+      tops: [] as THREE.Matrix4[],
+      legs: [] as THREE.Matrix4[],
+      chairs: [] as THREE.Matrix4[],
+      cushionColors: [] as THREE.Color[],
+      benches: [] as THREE.Matrix4[],
+      pillows: [] as THREE.Matrix4[],
+      pillowColors: [] as THREE.Color[],
+      glasses: [] as THREE.Matrix4[],
+      candles: [] as THREE.Matrix4[],
+      shadows: [] as THREE.Matrix4[],
+    }
     const palette = ['#8fa3ad', '#e08a5a', '#e6dccb', '#5f9c95'].map((c) => new THREE.Color(c))
-    const out = { tops: [] as THREE.Matrix4[], legs: [] as THREE.Matrix4[], chairs: [] as THREE.Matrix4[], cushionColors: [] as THREE.Color[] }
-    tables.forEach(([x, z], ti) => {
-      out.tops.push(mat([x, DECK_Y + 0.75, z], [1.3, 0.05, 0.85]))
-      ;[-0.5, 0.5].forEach((dx) => out.legs.push(mat([x + dx, DECK_Y + 0.37, z], [1, 0.74, 1])))
-      ;[0, Math.PI].forEach((a, k) => {
-        const ry = a + (r() - 0.5) * 0.35
-        const cx = x + Math.sin(a) * 0.95 + (r() - 0.5) * 0.2
-        const cz = z + Math.cos(a) * 0.95
-        out.chairs.push(mat([cx, DECK_Y, cz], [1, 1, 1], ry))
-        out.cushionColors.push(palette[(ti + k) % palette.length])
+    // зелёные подушки — примета веранды на фото
+    const pillowPalette = ['#2f7a4a', '#e0803f', '#2f7a4a', '#d9cdb8'].map((c) => new THREE.Color(c))
+    const PROP_Y = DECK_Y + 0.78
+    let k = 0
+    /** Точка в локальных координатах стола, повёрнутого на theta вокруг Y */
+    const at = (x: number, z: number, theta: number, lx: number, lz: number): [number, number, number] => [
+      x + lx * Math.cos(theta) + lz * Math.sin(theta),
+      PROP_Y,
+      z - lx * Math.sin(theta) + lz * Math.cos(theta),
+    ]
+    const table = (x: number, z: number, theta: number) => {
+      out.tops.push(mat([x, DECK_Y + 0.75, z], [1, 1, 1], theta))
+      ;[-0.5, 0.5].forEach((d) => out.legs.push(mat([x + Math.cos(theta) * d, DECK_Y + 0.37, z - Math.sin(theta) * d], [1, 0.74, 1])))
+      out.shadows.push(mat([x, DECK_Y + 0.02, z], [2.2, 1, 1.6], theta))
+      out.glasses.push(mat(at(x, z, theta, 0.3, 0.16), [1, 1, 1]))
+      out.glasses.push(mat(at(x, z, theta, 0.16, -0.2), [1, 1, 1]))
+      out.candles.push(mat(at(x, z, theta, -0.34, 0.02), [1, 1, 1]))
+    }
+    const chair = (x: number, z: number, theta: number) => {
+      out.chairs.push(mat([x, DECK_Y, z], [1, 1, 1], theta + (r() - 0.5) * 0.24))
+      out.cushionColors.push(palette[k++ % palette.length])
+      out.shadows.push(mat([x, DECK_Y + 0.02, z], [1.1, 1, 1.1], theta))
+    }
+
+    // [x скамьи, z, сторона прохода: −1 слева, +1 справа]. Слева пропуск
+    // посередине: там сквозь настил растёт дерево в кашпо (−6.8, −81.6)
+    const bays: [number, number, 1 | -1][] = [
+      [-5.1, -75.8, -1],
+      [-5.1, -78.8, -1],
+      [-5.1, -85, -1],
+      [3.3, -76.4, 1],
+      [3.3, -79.6, 1],
+      [3.3, -82.8, 1],
+    ]
+    bays.forEach(([bx, bz, dir]) => {
+      const back = (dir * Math.PI) / 2
+      out.benches.push(mat([bx, DECK_Y, bz], [1, 1, 1], back))
+      out.shadows.push(mat([bx, DECK_Y + 0.02, bz], [1.4, 1, 3], back))
+      ;[-0.62, 0.62].forEach((lz, i) => {
+        out.pillows.push(mat([bx - dir * 0.28, DECK_Y + 0.66, bz + lz], [1, 1, 1], back, i ? 0.2 : -0.22))
+        out.pillowColors.push(pillowPalette[(k + i) % pillowPalette.length])
       })
+      const tx = bx + dir * 1.45
+      table(tx, bz, Math.PI / 2)
+      ;[-0.45, 0.45].forEach((dz) => chair(tx + dir * 1.35, bz + dz, (dir * Math.PI) / 2))
+    })
+
+    // ряд у левой перегородки и столик у входа
+    const loose: [number, number][] = [
+      [-9.9, -76.4],
+      [-9.9, -80.6],
+      [-9.9, -84.6],
+      [-10.4, -73.4],
+      [7.2, -75.2],
+    ]
+    loose.forEach(([x, z]) => {
+      table(x, z, 0)
+      chair(x, z - 0.95, Math.PI)
+      chair(x, z + 0.95, 0)
     })
     return out
   }, [])
+
+  /**
+   * Ящики с зеленью вдоль прохода — главная примета веранды на фото:
+   * длинные деревянные короба, из них плотной грядкой торчат зелёные и
+   * бордовые листья. Они же отделяют проход от посадки.
+   */
+  const rails = useMemo(() => {
+    const r = seeded(23)
+    const boxes: THREE.Matrix4[] = []
+    const leaves: THREE.Matrix4[] = []
+    const colors: THREE.Color[] = []
+    // Зелень с приглушёнными бордовыми и рыжими вкраплениями, как на фото.
+    // Насыщенный красный тут читается помидорами, а не листвой
+    // Зелень — основа, бордовые и рыжие листья редкими вкраплениями: когда
+    // их было по трети палитры, грядка читалась ящиком с яблоками
+    const palette = ['#4f8f3f', '#3f7d33', '#6a9c42', '#79913a', '#58963c'].map((c) => new THREE.Color(c))
+    const accents = ['#6b3a30', '#4f3348'].map((c) => new THREE.Color(c))
+    for (const x of RAIL_X) {
+      for (let z = -72.8; z > -85.4; z -= 2) boxes.push(mat([x, DECK_Y + 0.33, z - 1], [0.58, 0.66, 1.94]))
+      // Мелко, часто и приплюснуто: шар даёт «пузырь», а сплющенный комок —
+      // куст. Лист ≈ 0.15–0.3 м в поперечнике, шаг вдвое меньше листа
+      for (let z = -72.8; z > -85.4; z -= 0.055) {
+        const s = 0.07 + r() * 0.07
+        leaves.push(mat([x + (r() - 0.5) * 0.5, DECK_Y + 0.62 + r() * 0.28, z + (r() - 0.5) * 0.16], [s, s * 0.55, s], r() * 3, r() * 3))
+        const accent = r() < 0.14
+        colors.push(accent ? accents[Math.floor(r() * accents.length)] : palette[Math.floor(r() * palette.length)])
+      }
+    }
+    return { boxes, leaves, colors }
+  }, [])
+
+  /** Подвесные кашпо со свисающими плетями — рядами над ящиками */
+  const baskets = useMemo(() => {
+    const r = seeded(37)
+    const pots: THREE.Matrix4[] = []
+    const cords: THREE.Matrix4[] = []
+    const leaves: THREE.Matrix4[] = []
+    const colors: THREE.Color[] = []
+    const palette = ['#5fa049', '#4a8f3c', '#6aa84f', '#8fb84a'].map((c) => new THREE.Color(c))
+    for (const x of RAIL_X) {
+      for (const z of [-75.4, -79.4, -83.4]) {
+        pots.push(mat([x, T.roofY - 0.62, z]))
+        cords.push(mat([x, T.roofY - 0.31, z], [1, 0.62, 1]))
+        for (let i = 0; i < 40; i++) {
+          const a = r() * Math.PI * 2
+          const rad = 0.08 + r() * 0.28
+          const drop = Math.pow(r(), 1.6) * 0.72
+          const s = 0.05 + r() * 0.07
+          leaves.push(mat([x + Math.cos(a) * rad, T.roofY - 0.5 - drop, z + Math.sin(a) * rad], [s, s, s], r() * 3, r() * 3))
+          colors.push(palette[Math.floor(r() * palette.length)])
+        }
+      }
+    }
+    return { pots, cords, leaves, colors }
+  }, [T.roofY])
 
   // ── облако искусственных цветов над лаунжем ──
   const blooms = useMemo(() => {
@@ -326,8 +504,19 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       items.push(mat([x, y, z], [s, s, s], r() * 3, r() * 3))
       colors.push(palette[Math.floor(r() * palette.length)])
     }
+    // Гирлянда цветов по кромке навеса вдоль всего фасада: на фото она
+    // свисает над ящиками с кустарником по обе стороны от входа. Над самим
+    // входом просвет — туда входят, и камера кадра 3 идёт ровно там
+    const m = quality === 'high' ? 620 : 300
+    for (let i = 0; i < m; i++) {
+      const x = T.x0 + r() * (T.x1 - T.x0)
+      if (Math.abs(x) < T.entrance + 0.8) continue
+      const s = 0.022 + r() * 0.032
+      items.push(mat([x, T.roofY - 0.05 - Math.pow(r(), 1.7), T.zFront + 0.1 + (r() - 0.5) * 0.5], [s, s, s], r() * 3, r() * 3))
+      colors.push(palette[Math.floor(r() * palette.length)])
+    }
     return { items, colors }
-  }, [T.roofY, quality])
+  }, [T, quality])
 
   // ── цветы в ящиках вдоль фасада зала ──
   const flowerBed = useMemo(() => {
@@ -462,8 +651,9 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
           <boxGeometry args={[0.08, 0.12, T.zFront - T.zBack]} />
         </mesh>
       ))}
-      <Instances items={awning} geometry={geos.pleat} material={mats.awning} />
-      <Instances items={awning} geometry={geos.pleat} material={mats.awningTop} />
+      <Instances items={roof.pleat} geometry={geos.pleat} material={mats.awning} />
+      <Instances items={roof.pleat} geometry={geos.pleat} material={mats.awningTop} />
+      <Instances items={roof.wood} geometry={geos.panel} material={mats.ceiling} />
       {/* поперечные профили на стыках полотен: без них торцы складок
           читались пилой через весь потолок террасы */}
       {Array.from({ length: Math.round((T.zFront - T.zBack) / 2.8) - 1 }, (_, i) => T.zFront - 2.8 * (i + 1)).map((z) => (
@@ -482,20 +672,45 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         </mesh>
       ))}
 
-      {/* кресла и столы */}
-      <Instances items={dining.tops} geometry={geos.box} material={mats.tableWood} />
+      {/* ящики с зеленью вдоль прохода и подвесные кашпо над ними */}
+      <Instances items={rails.boxes} geometry={geos.box} material={mats.planter} />
+      <Instances items={rails.leaves} geometry={geos.bloom} material={mats.leafTint} colors={rails.colors} />
+      <Instances items={baskets.cords} geometry={geos.cord} material={mats.rib} />
+      <Instances items={baskets.pots} geometry={geos.pot} material={mats.pot} />
+      <Instances items={baskets.leaves} geometry={geos.bloom} material={mats.leafTint} colors={baskets.colors} />
+
+      {/* скамьи, столы, кресла и сервировка */}
+      <Instances items={dining.shadows} geometry={geos.shadow} material={mats.contact} />
+      <Instances items={dining.benches} geometry={geos.bench.frame} material={mats.benchWood} />
+      <Instances items={dining.benches} geometry={geos.bench.cushion} material={mats.benchSeat} />
+      <Instances items={dining.pillows} geometry={geos.pillow} material={mats.cushion} colors={dining.pillowColors} />
+      <Instances items={dining.tops} geometry={geos.top} material={mats.herring} />
       <Instances items={dining.legs} geometry={geos.leg} material={steel} />
       <Instances items={dining.chairs} geometry={geos.chair.woven} material={mats.rattan} />
       <Instances items={dining.chairs} geometry={geos.chair.frame} material={mats.rattanSolid} />
       <Instances items={dining.chairs} geometry={geos.chair.cushion} material={mats.cushion} colors={dining.cushionColors} />
+      <Instances items={dining.glasses} geometry={geos.glass} material={mats.glass} />
+      <Instances items={dining.candles} geometry={geos.candle} material={mats.wax} />
+      <Instances items={dining.candles} geometry={geos.flame} material={mats.flame} />
+
+      {/* фасад зала со стороны веранды: тёмная реечная обшивка по бокам проёма */}
+      {[-9.5, 9.5].map((x) => (
+        <mesh key={x} position={[x, DECK_Y + 0.6, T.zBack + 0.1]} material={mats.planter}>
+          <planeGeometry args={[5, 1.2]} />
+        </mesh>
+      ))}
 
       {/* плетёные подвесные лампы-корзины над столами */}
+      {/* Только над левым рядом и у входа: над правым рядом лампа оказалась бы
+          прямо на пути камеры 8 → 9, которая выходит из зала через веранду */}
       {[
-        [-4.6, -75.4],
-        [2.6, -77.2],
-        [3, -81.2],
+        [-6.55, -77],
+        [-6.55, -84.4],
+        [-9.9, -80.6],
+        [7.2, -75.2],
       ].map(([x, z]) => (
-        <group key={x} position={[x, T.roofY, z]}>
+        // ключ по двум координатам: над левым рядом две лампы стоят на одном x
+        <group key={`${x}${z}`} position={[x, T.roofY, z]}>
           <mesh position={[0, -0.35, 0]}>
             <cylinderGeometry args={[0.006, 0.006, 0.7, 3]} />
             <meshBasicMaterial color="#111" />
@@ -539,6 +754,9 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
         [10.6, -82, 0],
       ].map(([x, z, ry]) => (
         <group key={z} position={[x, DECK_Y, z]} rotation-y={ry}>
+          {/* тень под диваном: без неё лаунж «висел» над настилом, пока
+              у столов веранды тени уже были */}
+          <mesh geometry={geos.shadow} material={mats.contact} position={[0, 0.02, 0]} scale={[3.2, 1, 1.9]} />
           <mesh position={[0, 0.22, 0]} material={mats.frameWood}>
             <boxGeometry args={[2.1, 0.12, 0.85]} />
           </mesh>
@@ -563,6 +781,18 @@ export function Pavilion({ quality }: { quality: 'high' | 'low' }) {
       <mesh position={[10.6, DECK_Y + 0.42, -79.7]} material={mats.frameWood}>
         <boxGeometry args={[1.5, 0.06, 0.8]} />
       </mesh>
+      {/* свечи и стаканы на столике лаунжа — он стоял пустым */}
+      {[
+        [10.1, -79.9],
+        [11.1, -79.5],
+      ].map(([x, z]) => (
+        <group key={`${x}${z}`}>
+          <mesh geometry={geos.candle} material={mats.wax} position={[x, DECK_Y + 0.45, z]} />
+          <mesh geometry={geos.flame} material={mats.flame} position={[x, DECK_Y + 0.45, z]} />
+        </group>
+      ))}
+      <mesh geometry={geos.glass} material={mats.glass} position={[10.6, DECK_Y + 0.45, -79.95]} />
+      <mesh geometry={geos.shadow} material={mats.contact} position={[10.6, DECK_Y + 0.02, -79.7]} scale={[2.4, 1, 1.6]} />
       {/* красные кресла на гнутых деревянных полозьях */}
       {[
         [9.1, -79, Math.PI / 2 + 0.2],

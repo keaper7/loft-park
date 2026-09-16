@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { fx, smoothstep } from './fx'
 import { HALL, TABLE_Z } from './layout'
 import {
@@ -15,6 +16,7 @@ import {
   herringboneTexture,
   mossTexture,
   planksTexture,
+  shadowTexture,
 } from './textures'
 import { buildWord, useEmblem } from './LoftSign'
 import { DJBooth } from './DJBooth'
@@ -45,14 +47,18 @@ import { crownGeometry, foliageMaterial, puffGeometry } from './foliage'
 
 const steel = new THREE.MeshStandardMaterial({ color: '#141416', metalness: 0.5, roughness: 0.5 })
 
-/** Мягкий диван: цоколь, сиденье, спинка, подлокотники. Спинка — у локального −z */
+/**
+ * Мягкий диван: цоколь, сиденье, спинка, подлокотники. Спинка — у локального −z.
+ * Скруглённые коробки, а не острые: на мягкой мебели рёбра ловят свет и
+ * сразу выдают «нарисовано в редакторе».
+ */
 function sofaGeometry(w: number) {
   return mergeGeometries([
-    new THREE.BoxGeometry(w, 0.3, 0.86).translate(0, 0.15, 0),
-    new THREE.BoxGeometry(w - 0.36, 0.16, 0.64).translate(0, 0.38, 0.07),
-    new THREE.BoxGeometry(w, 0.64, 0.24).translate(0, 0.62, -0.31),
-    new THREE.BoxGeometry(0.18, 0.52, 0.86).translate(-w / 2 + 0.09, 0.46, 0),
-    new THREE.BoxGeometry(0.18, 0.52, 0.86).translate(w / 2 - 0.09, 0.46, 0),
+    new RoundedBoxGeometry(w, 0.3, 0.86, 2, 0.05).translate(0, 0.15, 0),
+    new RoundedBoxGeometry(w - 0.36, 0.18, 0.64, 3, 0.07).translate(0, 0.38, 0.07),
+    new RoundedBoxGeometry(w, 0.64, 0.26, 3, 0.09).translate(0, 0.62, -0.3),
+    new RoundedBoxGeometry(0.2, 0.52, 0.86, 3, 0.08).translate(-w / 2 + 0.1, 0.46, 0),
+    new RoundedBoxGeometry(0.2, 0.52, 0.86, 3, 0.08).translate(w / 2 - 0.1, 0.46, 0),
   ])!
 }
 
@@ -116,6 +122,7 @@ export function Hall() {
       brick: brickTexture([0.5, 2.4]),
       plaster: concreteTexture(),
       cove: coveGlowTexture(),
+      shadow: shadowTexture(),
       spot: glowTexture(),
       screen: carvedScreenTexture(),
       herring,
@@ -130,6 +137,37 @@ export function Hall() {
   const geos = useMemo(
     () => ({
       box: new THREE.BoxGeometry(1, 1, 1),
+      pillow: new RoundedBoxGeometry(1, 1, 1, 3, 0.22),
+      // столешницы с фаской: острая кромка бликовала линейкой
+      top: new RoundedBoxGeometry(1.2, 0.06, 0.8, 3, 0.02),
+      section: new RoundedBoxGeometry(3.6, 0.06, 1.4, 3, 0.025),
+      shadow: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+      // мелочь на столах
+      napkin: new RoundedBoxGeometry(0.17, 0.1, 0.12, 2, 0.02).translate(0, 0.05, 0),
+      // стакан: тонкая стенка без крышек + донце, иначе это белый цилиндр
+      glass: mergeGeometries([
+        new THREE.CylinderGeometry(0.036, 0.03, 0.12, 14, 1, true).translate(0, 0.06, 0),
+        new THREE.CylinderGeometry(0.03, 0.03, 0.012, 14).translate(0, 0.006, 0),
+      ])!,
+      candle: new THREE.CylinderGeometry(0.028, 0.028, 0.09, 10).translate(0, 0.045, 0),
+      flame: new THREE.SphereGeometry(0.016, 8, 6).translate(0, 0.105, 0),
+      // Меню в деревянном держателе. Обе части — RoundedBoxGeometry: она
+      // неиндексированная, и склейка с индексированной BoxGeometry возвращает
+      // null, а null-геометрия в инстансе роняет отрисовку кадра
+      menu: mergeGeometries([
+        new RoundedBoxGeometry(0.13, 0.19, 0.012, 2, 0.004).rotateX(-0.2).translate(0, 0.1, 0),
+        new RoundedBoxGeometry(0.15, 0.02, 0.05, 1, 0.006).translate(0, 0.01, 0.015),
+      ])!,
+      // вазочка с сухими ветками: стекло и ветки — разными материалами
+      vaseBody: new THREE.CylinderGeometry(0.035, 0.028, 0.12, 12).translate(0, 0.06, 0),
+      vaseStems: mergeGeometries(
+        [0, 1, 2].map((i) =>
+          new THREE.CylinderGeometry(0.004, 0.004, 0.26, 3)
+            .rotateZ((i - 1) * 0.2)
+            .rotateY(i * 1.1)
+            .translate((i - 1) * 0.015, 0.22, 0),
+        ),
+      )!,
       cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
       ball: new THREE.SphereGeometry(1, 14, 10),
       leaf: puffGeometry(),
@@ -174,6 +212,11 @@ export function Hall() {
       greenGlass: new THREE.MeshStandardMaterial({ color: '#7ab86a', emissive: '#2f7a2a', emissiveIntensity: 1.1, roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false }),
       curtain: new THREE.MeshStandardMaterial({ color: '#c08a58', roughness: 0.9, side: THREE.DoubleSide }),
       night: new THREE.MeshBasicMaterial({ color: '#0f1a24' }),
+      glass: new THREE.MeshStandardMaterial({ color: '#dfe8ea', roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }),
+      contact: new THREE.MeshBasicMaterial({ map: tex.shadow, transparent: true, depthWrite: false }),
+      // абажур-конус открыт снизу: с односторонним материалом изнутри он
+      // был бы дырой, сквозь которую видно потолок
+      shade: new THREE.MeshStandardMaterial({ color: '#141416', metalness: 0.5, roughness: 0.5, side: THREE.DoubleSide }),
     }),
     [tex],
   )
@@ -191,7 +234,14 @@ export function Hall() {
       chairs: [] as THREE.Matrix4[],
       chairColors: [] as THREE.Color[],
       chairLegs: [] as THREE.Matrix4[],
+      shadows: [] as THREE.Matrix4[],
+      napkins: [] as THREE.Matrix4[],
+      glasses: [] as THREE.Matrix4[],
+      candles: [] as THREE.Matrix4[],
+      menus: [] as THREE.Matrix4[],
+      vases: [] as THREE.Matrix4[],
     }
+    const PROP_Y = 0.78
     const beige = new THREE.Color('#b3a292')
     const taupe = new THREE.Color('#9b8f86')
     const pillowPalette = ['#d69aa2', '#e8dccb', '#3f7d78', '#c9785a'].map((c) => new THREE.Color(c))
@@ -201,6 +251,7 @@ export function Hall() {
       out.chairs.push(mat([x, 0, z], [1, 1, 1], theta))
       out.chairLegs.push(mat([x, 0, z], [1, 1, 1], theta))
       out.chairColors.push(chairPalette[k++ % chairPalette.length])
+      out.shadows.push(mat([x, 0.045, z], [1.1, 1, 1.1], theta))
     }
     const pillows = (x: number, z: number, theta: number, offsets: number[]) =>
       offsets.forEach((lx, i) => {
@@ -208,8 +259,18 @@ export function Hall() {
         out.pillowColors.push(pillowPalette[(k + i) % pillowPalette.length])
       })
     const table = (x: number, z: number, theta: number) => {
-      out.tops.push(mat([x, 0.75, z], [1.2, 0.05, 0.8], theta))
+      out.tops.push(mat([x, 0.75, z], [1, 1, 1], theta))
       out.tableLegs.push(mat([x, 0, z], [1, 1, 1], theta))
+      out.shadows.push(mat([x, 0.045, z], [2, 1, 1.6], theta))
+      // сервировка: салфетница, два стакана и свеча — как на фото столов
+      out.napkins.push(mat(place(x, z, theta, 0.34, PROP_Y, 0.04), [1, 1, 1], theta + 0.25))
+      out.glasses.push(mat(place(x, z, theta, -0.2, PROP_Y, 0.13), [1, 1, 1], 0))
+      out.glasses.push(mat(place(x, z, theta, -0.31, PROP_Y, -0.09), [1, 1, 1], 0))
+      out.candles.push(mat(place(x, z, theta, 0.06, PROP_Y, -0.03), [1, 1, 1], 0))
+      // меню в держателе — на фото стоит на каждом столе; вазочка с сухими
+      // ветками через стол, иначе сервировка выглядит под копирку
+      out.menus.push(mat(place(x, z, theta, -0.44, PROP_Y, -0.2), [1, 1, 1], theta + 0.5))
+      if (out.tops.length % 2 === 1) out.vases.push(mat(place(x, z, theta, 0.42, PROP_Y, -0.24), [1, 1, 1], theta))
     }
 
     // диваны под окнами: спинкой к стене, стол и два кресла напротив
@@ -223,29 +284,46 @@ export function Hall() {
       const theta = left ? Math.PI / 2 : -Math.PI / 2
       out.sofas.push(mat([x, 0, z], [1, 1, 1], theta))
       out.sofaColors.push(left ? beige : taupe)
+      out.shadows.push(mat([x, 0.045, z], [1.6, 1, 3], theta))
       pillows(x, z, theta, [-0.7, 0.65])
       const tx = x + (left ? 1.25 : -1.25)
       table(tx, z, theta)
       chair(tx + (left ? 0.95 : -0.95), z - 0.36, left ? -Math.PI / 2 : Math.PI / 2)
       chair(tx + (left ? 0.95 : -0.95), z + 0.36, left ? -Math.PI / 2 : Math.PI / 2)
     }
-    // длинный серый диван под буквами на мху — как на фото стены
-    const bx = 0
+    // Ряд диванов под буквами на мху: на фото он идёт вдоль всей стены, а не
+    // одним диваном по центру. Левее второго дивана места нет — там DJ-пульт
     const bz = H.zBack + 0.55
-    out.longSofas.push(mat([bx, 0, bz], [1, 1, 1], 0))
-    pillows(bx, bz, 0, [-1.4, -0.3, 1.2])
-    table(bx - 0.9, bz + 1.2, 0)
-    table(bx + 0.9, bz + 1.2, 0)
-    chair(bx - 0.9, bz + 2.15, Math.PI)
-    chair(bx + 0.9, bz + 2.15, Math.PI)
+    for (const bx of [0, 4.8]) {
+      out.longSofas.push(mat([bx, 0, bz], [1, 1, 1], 0))
+      out.shadows.push(mat([bx, 0.045, bz], [5.2, 1, 1.8], 0))
+      pillows(bx, bz, 0, [-1.4, -0.3, 1.2])
+      table(bx - 0.9, bz + 1.2, 0)
+      table(bx + 0.9, bz + 1.2, 0)
+      chair(bx - 0.9, bz + 2.15, Math.PI)
+      chair(bx + 0.9, bz + 2.15, Math.PI)
+    }
     // кресла у общего стола — с дальней стороны, лицом к камере на блюдах
     for (const x of [-4.5, -2.7, -0.9, 0.9, 2.7, 4.5]) chair(x, TABLE_Z - 0.85, 0)
-    // столы на четверых между входом и общим столом. Ниже пролётов камеры
-    // 3 → 4 и 6 → 7 (там камера на высоте ≈ 1.8 м) и позади кадров с блюдами
-    for (const x of [-4.6, -1.6, 1.4]) {
-      table(x, -89, 0)
-      chair(x, -89.75, 0)
-      chair(x, -88.25, Math.PI)
+    // Плотная посадка между входом и общим столом — как на фото зала.
+    // Всё ниже пролётов камеры 3 → 4, 6 → 7 и 7 → 8 (там камера на высоте
+    // ≈ 1.8–2.2 м) и позади кадров с блюдами
+    for (const [x, z] of [
+      [-7.6, -89],
+      [-4.6, -89],
+      [-1.6, -89],
+      [1.4, -89],
+      [4.4, -89],
+      [-8.4, -92.2],
+      [8.6, -91.5],
+      // ряд у самого входа: с порога зал должен выглядеть полным
+      [-7.6, -87.2],
+      [1.4, -87.2],
+      [4.4, -87.2],
+    ] as [number, number][]) {
+      table(x, z, 0)
+      chair(x, z - 0.75, 0)
+      chair(x, z + 0.75, Math.PI)
     }
     return out
   }, [H.x0, H.x1, H.zBack])
@@ -281,9 +359,10 @@ export function Hall() {
         let t = -w / 2 + 0.08
         while (t < w / 2 - 0.1) {
           const along = (v: number) => (alongZ ? [cx + (r() - 0.5) * d * 0.3, cz + v] : [cx + v, cz + (r() - 0.5) * d * 0.3])
-          // на фото стеллажи — это зелень и зелёные бутылки, книг немного
+          // на фото стеллажи — это прежде всего зелень: с каждой полки
+          // свисают плети плюща, между ними зелёные бутылки, книг немного
           const roll = r()
-          const kind = barShelf ? 0 : roll < 0.42 ? 0 : roll < 0.62 ? 2 : 3
+          const kind = barShelf ? 0 : roll < 0.34 ? 0 : roll < 0.46 ? 2 : 3
           if (kind === 0) {
             // ряд бутылок
             const n = 2 + Math.floor(r() * 4)
@@ -305,8 +384,10 @@ export function Hall() {
           } else {
             // горшок с зеленью и плети плюща
             const [x, z] = along(t)
-            leaf(x, y + 0.16, z, 0.16 + r() * 0.08)
-            if (li > 0) for (let s = 0; s < 4; s++) leaf(x + (r() - 0.5) * 0.12, y - 0.1 - s * 0.14, z + (r() - 0.5) * 0.12, 0.06)
+            leaf(x, y + 0.17, z, 0.17 + r() * 0.09)
+            leaf(x + 0.11, y + 0.13, z, 0.12 + r() * 0.07)
+            // плеть свисает до следующей полки — так стеллажи и выглядят на фото
+            if (li > 0) for (let s = 0; s < 7; s++) leaf(x + (r() - 0.5) * 0.14, y - 0.08 - s * 0.13, z + (r() - 0.5) * 0.14, 0.055 + r() * 0.03)
             t += 0.3
           }
           t += 0.06
@@ -371,6 +452,11 @@ export function Hall() {
     [H.x0 + 1.95, 2.85, -94.3, true],
     [-8.8, 2.7, -100.4, true],
     [-10.2, 2.9, -100.1, false],
+    // у входа и вдоль правой стены: потолок в передней половине зала пустовал
+    [-9.2, 2.65, -87.6, false],
+    [9.2, 2.8, -87.6, true],
+    [-9.2, 2.85, -91.2, true],
+    [9.4, 2.6, -95.5, false],
   ]
 
   return (
@@ -412,6 +498,18 @@ export function Hall() {
       ].map(([x, z, w, d]) => (
         <mesh key={`${x}${z}`} position={[x, SOFFIT_Y + 0.33, z]} material={mats.cove}>
           <boxGeometry args={[w, 0.03, d]} />
+        </mesh>
+      ))}
+
+      {/* стальные балки и труба под потолком — лофтовая деталь с фото зала */}
+      {Array.from({ length: 6 }, (_, i) => H.zFront - 2.4 - i * 2.4).map((z) => (
+        <mesh key={`beam${z}`} position={[0, SOFFIT_Y + 0.04, z]} material={steel}>
+          <boxGeometry args={[width - COVE * 2, 0.16, 0.1]} />
+        </mesh>
+      ))}
+      {[-5.8, 5.8].map((x) => (
+        <mesh key={`pipe${x}`} position={[x, SOFFIT_Y - 0.14, cz]} rotation-x={Math.PI / 2} material={steel}>
+          <cylinderGeometry args={[0.05, 0.05, depth - COVE * 2, 10]} />
         </mesh>
       ))}
 
@@ -523,7 +621,7 @@ export function Hall() {
       {[-3.6, -2.2, 2.2, 3.6].map((x) => (
         <mesh key={`pool${x}`} position={[x * 0.92, SOFFIT_Y - 1.15, H.zBack + 0.075]}>
           <planeGeometry args={[2.1, 2.7]} />
-          <meshBasicMaterial map={tex.spot} transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} />
+          <meshBasicMaterial map={tex.spot} transparent opacity={0.26} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       ))}
       <group position={[-2.4, 2.95, H.zBack + 0.75]}>
@@ -554,19 +652,32 @@ export function Hall() {
           барной стойкой. Блюдо на каждом столе по центру (x = −3.6, 0, 3.6) */}
       {[-3.6, 0, 3.6].map((x) => (
         <group key={x} position={[x, 0, TABLE_Z]}>
-          <mesh position={[0, 0.74, 0]}>
-            {/* глубина 1.4: доска с хачапури не свисает с края */}
-            <boxGeometry args={[3.6, 0.06, 1.4]} />
+          <mesh position={[0, 0.74, 0]} geometry={geos.section}>
             <meshStandardMaterial map={tex.longHerring} roughness={0.5} />
           </mesh>
+          <mesh geometry={geos.shadow} material={mats.contact} position={[0, 0.045, 0]} scale={[4.6, 1, 2.4]} />
+          <mesh geometry={geos.napkin} material={mats.darkWood} position={[1.45, 0.77, 0.32]} rotation-y={0.3} />
+          <mesh geometry={geos.glass} material={mats.glass} position={[-1.52, 0.77, 0.36]} />
+          <mesh geometry={geos.glass} material={mats.glass} position={[-1.24, 0.77, 0.16]} />
+          <mesh geometry={geos.candle} material={mats.plain} position={[1.12, 0.77, -0.34]} />
+          <mesh geometry={geos.flame} material={mats.bulb} position={[1.12, 0.77, -0.34]} />
           <mesh geometry={geos.sectionLegs} material={steel} />
         </group>
       ))}
 
       <Instances items={furniture.sofas} geometry={geos.sofa} material={mats.fabric} colors={furniture.sofaColors} />
       <Instances items={furniture.longSofas} geometry={geos.longSofa} material={mats.fabric} colors={[new THREE.Color('#8c8782')]} />
-      <Instances items={furniture.pillows} geometry={geos.box} material={mats.fabric} colors={furniture.pillowColors} />
-      <Instances items={furniture.tops} geometry={geos.box} material={mats.tableTop} />
+      <Instances items={furniture.pillows} geometry={geos.pillow} material={mats.fabric} colors={furniture.pillowColors} />
+      <Instances items={furniture.tops} geometry={geos.top} material={mats.tableTop} />
+      {/* тени-пятна под мебелью и сервировка */}
+      <Instances items={furniture.shadows} geometry={geos.shadow} material={mats.contact} />
+      <Instances items={furniture.napkins} geometry={geos.napkin} material={mats.darkWood} />
+      <Instances items={furniture.menus} geometry={geos.menu} material={mats.darkWood} />
+      <Instances items={furniture.vases} geometry={geos.vaseBody} material={mats.glass} />
+      <Instances items={furniture.vases} geometry={geos.vaseStems} material={mats.darkWood} />
+      <Instances items={furniture.glasses} geometry={geos.glass} material={mats.glass} />
+      <Instances items={furniture.candles} geometry={geos.candle} material={mats.plain} />
+      <Instances items={furniture.candles} geometry={geos.flame} material={mats.bulb} />
       <Instances items={furniture.tableLegs} geometry={geos.tableLegs} material={steel} />
       <Instances items={furniture.chairs} geometry={geos.armchair} material={mats.velvet} colors={furniture.chairColors} />
       <Instances items={furniture.chairLegs} geometry={geos.legs} material={steel} />
@@ -657,11 +768,32 @@ export function Hall() {
         </mesh>
       ))}
 
-      {/* высокие кашпо с зеленью у входа и в углу */}
+      {/* чёрные конусы-подвесы над столами — на фото такие висят рядами.
+          Позиции проверены против пролётов камеры 6 → 7 и 7 → 8: ближайшая
+          лампа проходит в полуметре над объективом, а не сквозь него */}
+      {[
+        [-7.6, -89],
+        [4.4, -89],
+        [-8.4, -92.2],
+      ].map(([x, z]) => (
+        <group key={`${x}${z}`} position={[x, 2.72, z]}>
+          <mesh position={[0, 0.5, 0]} material={mats.wire}>
+            <cylinderGeometry args={[0.007, 0.007, 1, 3]} />
+          </mesh>
+          <mesh material={mats.shade}>
+            <cylinderGeometry args={[0.055, 0.19, 0.22, 16, 1, true]} />
+          </mesh>
+          <mesh position={[0, -0.1, 0]} scale={[0.05, 0.07, 0.05]} geometry={geos.ball} material={mats.bulb} />
+        </group>
+      ))}
+
+      {/* высокие кашпо с зеленью у входа, у стен и в углу */}
       {[
         [H.x0 + 0.8, H.zFront - 0.9],
         [H.x1 - 0.8, H.zFront - 0.9],
         [-11, H.zBack + 0.7],
+        [-11.1, -91.5],
+        [7.8, -96.5],
       ].map(([x, z]) => (
         <group key={`${x}${z}`} position={[x, 0, z]}>
           <mesh position={[0, 0.45, 0]}>
@@ -684,6 +816,9 @@ export function Hall() {
       <pointLight position={[0, 2.9, TABLE_Z + 0.5]} color="#ffb870" intensity={16} distance={10} decay={1.4} />
       <pointLight position={[-7.5, 2.7, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
       <pointLight position={[8.4, 2.6, -95]} color="#ffa552" intensity={12} distance={12} decay={1.4} />
+      {/* тёплый свет над диваном у стены из мха: без него дальний угол зала
+          уходил в темноту, а на фото это самое светлое место */}
+      <pointLight position={[0, 2.5, -99.6]} color="#ffb26a" intensity={9} distance={9} decay={1.5} />
 
       {/* DJ-пульт — в углу у стены из мха: центр под буквами занят диваном */}
       <group position={[-6.4, 0, 0]}>

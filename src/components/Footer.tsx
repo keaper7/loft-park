@@ -36,7 +36,7 @@ export function Footer() {
           </a>
         </Reveal>
 
-        <div className="mx-auto mt-16 grid max-w-[1320px] gap-10 border-t border-[var(--hair)] pt-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto mt-16 grid max-w-[1320px] gap-10 border-t border-[var(--hair)] pt-10 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p className="micro mb-3 text-[10px] text-[var(--dim-2)]">Адрес</p>
             <p className="text-lg">{contact.address}</p>
@@ -51,13 +51,6 @@ export function Footer() {
             <OpenStatus className="micro mt-2 text-[10px]" />
           </div>
           <div>
-            <p className="micro mb-3 text-[10px] text-[var(--dim-2)]">Связь</p>
-            <a href={contact.phoneHref} className="block text-lg hover:text-amber">{contact.phone}</a>
-            <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noreferrer" className="block text-[var(--dim)] hover:text-amber">
-              WhatsApp {contact.whatsappLabel}
-            </a>
-          </div>
-          <div>
             <p className="micro mb-3 text-[10px] text-[var(--dim-2)]">Соцсети</p>
             <a href={brand.instagram} target="_blank" rel="noreferrer" className="text-lg hover:text-amber">
               Instagram {brand.instagramHandle}
@@ -65,9 +58,24 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Стандартная подпись на всех сайтах SEVEN — та же формулировка и
+            ссылка, что на kingstudio.sevensites.ru и zarechye-boxing.ru.
+            Контакты выше — только у реального Loft Park (номера и WhatsApp
+            намеренно не публикуем, см. content.ts); связь по проекту — сюда. */}
         <div className="mx-auto mt-14 flex max-w-[1320px] flex-col justify-between gap-3 text-xs text-[var(--dim-2)] md:flex-row">
           <p>Концепт-проект для портфолио. Не официальный сайт ресторана; данные — из открытых источников, 2026.</p>
-          <p>Дизайн и разработка — SEVEN · 3D, WebGL, motion</p>
+          <p>
+            Дизайн и разработка —{' '}
+            <a
+              href="https://sevensites.ru"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cream underline decoration-1 underline-offset-4 transition-opacity hover:opacity-70"
+            >
+              SEVEN
+            </a>{' '}
+            · 3D, WebGL, motion
+          </p>
         </div>
       </div>
     </footer>

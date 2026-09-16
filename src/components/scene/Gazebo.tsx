@@ -64,7 +64,11 @@ export function Gazebo() {
       // задняя сторона и правая — сплошные; к террасе (x0) — подхваченные у стоек
       { pos: [G.x1, G.h / 2, cz], rotY: -Math.PI / 2, width: d },
       { pos: [cx, G.h / 2, G.zFar], rotY: 0, width: w },
-      { pos: [cx, G.h / 2, G.zNear], rotY: Math.PI, width: w },
+      // Фасад шатра — две шторы по краям, а не одно полотно во всю ширину:
+      // сплошное закрывало весь шатёр серой пеленой в кадре 9, который как раз
+      // на шатёр и смотрит. Посередине остаётся открытый проход
+      { pos: [G.x0 + 1.4, G.h / 2, G.zNear], rotY: Math.PI, width: 2.6 },
+      { pos: [G.x1 - 1.4, G.h / 2, G.zNear], rotY: Math.PI, width: 2.6 },
       { pos: [G.x0, G.h / 2, G.zNear - 1.2], rotY: Math.PI / 2, width: 2.2 },
       { pos: [G.x0, G.h / 2, G.zFar + 1.2], rotY: Math.PI / 2, width: 2.2 },
     ],
@@ -78,10 +82,30 @@ export function Gazebo() {
     const palette = ['#e9a3b8', '#f3eee6', '#c7849a', '#9fb3ad', '#5f7f47', '#7d9a5c'].map((c) => new THREE.Color(c))
     const items: THREE.Matrix4[] = []
     const colors: THREE.Color[] = []
-    for (let i = 0; i < 520; i++) {
-      const s = 0.026 + r() * 0.042
-      // гуще у крыши, редкие «плети» свисают ниже
-      items.push(mat([G.x0 + 0.6 + r() * (w - 1.2), G.h - 0.1 - Math.pow(r(), 2.2) * 0.9, G.zFar + 0.6 + r() * (d - 1.2)], [s, s, s], r() * 3, r() * 3))
+    // Цветы свисают гирляндой с балок по периметру и с центральной балки —
+    // как на фото. Равномерное облако по всему объёму читалось конфетти,
+    // висящим в воздухе посреди шатра
+    for (let i = 0; i < 560; i++) {
+      const t = r()
+      const side = Math.floor(r() * 5)
+      let x: number
+      let z: number
+      if (side === 0 || side === 1) {
+        // вдоль передней и задней балок
+        x = G.x0 + 0.5 + t * (w - 1)
+        z = side === 0 ? G.zNear - 0.3 : G.zFar + 0.3
+      } else if (side === 2 || side === 3) {
+        // вдоль боковых балок
+        x = side === 2 ? G.x0 + 0.3 : G.x1 - 0.3
+        z = G.zFar + 0.5 + t * (d - 1)
+      } else {
+        // центральная балка поперёк шатра
+        x = G.x0 + 0.5 + t * (w - 1)
+        z = cz
+      }
+      const s = 0.028 + r() * 0.04
+      // приплюснутый комок вместо шара: шар на таком размере читается бусиной
+      items.push(mat([x + (r() - 0.5) * 0.45, G.h - 0.08 - Math.pow(r(), 1.8) * 0.85, z + (r() - 0.5) * 0.45], [s, s * 0.7, s], r() * 3, r() * 3))
       colors.push(palette[Math.floor(r() * palette.length)])
     }
     return { items, colors }
@@ -103,7 +127,9 @@ export function Gazebo() {
     <group>
       <mesh position={[cx, 0.08, cz]}>
         <boxGeometry args={[w, 0.16, d]} />
-        <meshStandardMaterial color="#3a2a1d" roughness={0.9} />
+        {/* настил чуть светлее прежнего: на почти чёрном полу мебель шатра
+            не на чем было «поставить» — она читалась парящей */}
+        <meshStandardMaterial color="#453121" roughness={0.9} />
       </mesh>
       {[
         [G.x0, G.zNear],
@@ -132,7 +158,23 @@ export function Gazebo() {
       ))}
       <mesh position={[cx, G.h + 0.02, cz]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color="#f3efe6" transparent opacity={0.7} side={THREE.DoubleSide} />
+        {/* Крыша шатра светится изнутри. Плотностью тут не помочь: сверху на
+            неё падает только холодный свет неба (#4a6194) и луны, поэтому
+            тёплый беж отрисовывался синевато-серым — стеклянной крышей
+            бассейна. Собственное тёплое свечение — это то, как шатёр выглядит
+            ночью на фото: лампы под крышей просвечивают сквозь ткань.
+            0.42 × #a8763a даёт ~0.28 яркости — ниже порога bloom (0.95),
+            так что крыша не превращается в светящееся пятно.
+            Кадр 9.3 лежит на пути камеры 9 → 10 — этот ракурс видит и гость */}
+        <meshStandardMaterial
+          color="#e6d9c2"
+          emissive="#a8763a"
+          emissiveIntensity={0.42}
+          transparent
+          opacity={0.96}
+          roughness={1}
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
       {curtains.map((c, i) => (
@@ -207,6 +249,71 @@ export function Gazebo() {
         <meshStandardMaterial color="#6b442a" roughness={0.6} />
       </mesh>
 
+      {/* Длинный стол с лавками в ближней половине шатра. Вся мебель стояла в
+          дальней половине, и кадр 9 — тот, что смотрит в шатёр, — упирался в
+          пустой настил. Под шатром как раз и сидят большой компанией */}
+      <group position={[cx, 0.16, G.zNear - 3.2]}>
+        <mesh position={[0, 0.75, 0]}>
+          <boxGeometry args={[0.95, 0.06, 2.8]} />
+          <meshStandardMaterial color="#8a6038" roughness={0.6} />
+        </mesh>
+        {[-1.2, 1.2].map((dz) => (
+          <mesh key={dz} position={[0, 0.37, dz]}>
+            <boxGeometry args={[0.75, 0.72, 0.08]} />
+            {/* Опоры тёплого дерева, а не чёрная сталь: на тёмном настиле
+                ночью чёрные ножки пропадают, и столешница с лавками висят
+                в воздухе досками */}
+            <meshStandardMaterial color="#6b4a2c" roughness={0.7} />
+          </mesh>
+        ))}
+        {[-1.15, 1.15].map((dx) => (
+          <group key={dx} position={[dx, 0, 0]}>
+            <mesh position={[0, 0.44, 0]}>
+              <boxGeometry args={[0.38, 0.08, 2.4]} />
+              <meshStandardMaterial color="#8a6038" roughness={0.7} />
+            </mesh>
+            {[-0.9, 0.9].map((dz) => (
+              <mesh key={dz} position={[0, 0.2, dz]}>
+                <boxGeometry args={[0.32, 0.4, 0.06]} />
+                <meshStandardMaterial color="#6b4a2c" roughness={0.7} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+        {[-0.9, 0, 0.9].map((dz) => (
+          <group key={dz} position={[0, 0.83, dz]}>
+            <mesh>
+              <cylinderGeometry args={[0.03, 0.03, 0.1, 10]} />
+              <meshStandardMaterial color="#efe6d2" roughness={0.8} />
+            </mesh>
+            <mesh position={[0, 0.08, 0]}>
+              <sphereGeometry args={[0.016, 8, 6]} />
+              <meshBasicMaterial color={[6, 3.4, 1.3]} toneMapped={false} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+
+      {/* кадки с зеленью по углам у входа в шатёр */}
+      {[G.x0 + 0.9, G.x1 - 0.9].map((x) => (
+        <group key={x} position={[x, 0.16, G.zNear - 0.9]}>
+          <mesh position={[0, 0.3, 0]}>
+            <boxGeometry args={[0.6, 0.6, 0.6]} />
+            <meshStandardMaterial color="#2b2722" roughness={0.85} />
+          </mesh>
+          {[0, 1, 2, 3].map((k) => (
+            <mesh
+              key={k}
+              geometry={bloomGeo}
+              position={[Math.cos(k * 1.7) * 0.18, 0.75 + k * 0.17, Math.sin(k * 1.7) * 0.18]}
+              scale={[0.3, 0.22, 0.3]}
+            >
+              <meshStandardMaterial color="#3f7d33" roughness={1} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
       {/* «облако» цветов и зелени под крышей и лампочки в нём */}
       <Instances items={blooms.items} geometry={bloomGeo} material={bloomMat} colors={blooms.colors} />
       {Array.from({ length: 8 }, (_, i) => (
@@ -216,6 +323,9 @@ export function Gazebo() {
         </mesh>
       ))}
       <pointLight position={[cx, G.h - 0.8, cz]} color="#ffb46a" intensity={10} distance={10} decay={1.5} />
+      {/* вторая лампа над новым столом: единственная висела над центром
+          шатра, и ближняя половина — та, в которую смотрит кадр 9, — тонула */}
+      <pointLight position={[cx, G.h - 0.9, G.zNear - 3.2]} color="#ffb46a" intensity={8} distance={8} decay={1.5} />
     </group>
   )
 }

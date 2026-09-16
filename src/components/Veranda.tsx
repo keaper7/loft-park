@@ -149,7 +149,9 @@ export function Veranda() {
       <section ref={section} className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden py-16">
         <div className="px-[var(--pad)]">
           <p className="micro mb-4 text-amber">{veranda.eyebrow}</p>
-          <SplitText text={veranda.title} className="display text-[clamp(38px,5.5vw,92px)]" />
+          {/* 32px снизу, а не 38: на экране 320px «ОТКРЫТЫМ» при 38px
+              занимало 295px в колонке шириной 280 и вылезало за край */}
+          <SplitText text={veranda.title} className="display text-[clamp(32px,5.5vw,92px)]" />
         </div>
         <div
           ref={track}

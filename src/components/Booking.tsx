@@ -96,9 +96,11 @@ export function Booking() {
         <div className="min-w-0">
           <p className="micro mb-4 text-amber">{booking.eyebrow}</p>
           {/* «Забронировать» — 13 широких букв Unbounded, которые SplitText не
-              переносит. Нижняя граница 24px, а не 30px: на экране 320px слово
-              при 30px занимало 323px в колонке шириной 280 и вылезало за край */}
-          <SplitText text={booking.title} className="display text-[clamp(24px,3.4vw,66px)]" />
+              переносит: ширина слова ≈ 11.5 × размер шрифта, вдвое хуже любого
+              другого заголовка сайта. Потолок 46px (а не 66) — на 1920px при
+              66px слово занимало 746px в колонке 569px; 3.1vw вместо 3.4vw —
+              из-за вылета на 1024 и 1280px; 22px снизу — запас на 320px */}
+          <SplitText text={booking.title} className="display text-[clamp(22px,3.1vw,46px)]" />
           <p className="mt-6 max-w-[440px] leading-relaxed text-[var(--dim)]">{booking.text}</p>
         </div>
 

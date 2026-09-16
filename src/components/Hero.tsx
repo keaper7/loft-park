@@ -47,24 +47,12 @@ export function Hero() {
       {/* Появление и затухание по скроллу — на разных элементах. На одном
           initial-прозрачность и style-прозрачность от скролла спорили:
           сервер рисовал 1, клиент 0 — ошибка гидратации в консоли */}
-      <motion.div style={{ opacity: fade }} className="mb-6 flex flex-col items-start gap-3">
-        {/* Бейдж на самом первом экране, а не только в футере: если сайт
-            уходит в сторис/рилс, зритель видит «это концепт» с первого кадра,
-            а не долистав до конца одностраничника */}
-        <motion.span
-          className="glass micro inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] text-[var(--dim)]"
-          initial={{ opacity: 0, y: 12 }}
-          animate={show ? { opacity: 1, y: 0 } : undefined}
-          transition={{ duration: 1, ease: EASE, delay: 0.05 }}
-        >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber" />
-          Концепт для портфолио · не официальный сайт
-        </motion.span>
+      <motion.div style={{ opacity: fade }}>
         <motion.p
-          className="micro text-amber"
+          className="micro mb-6 text-amber"
           initial={{ opacity: 0, y: 12 }}
           animate={show ? { opacity: 1, y: 0 } : undefined}
-          transition={{ duration: 1, ease: EASE, delay: 0.15 }}
+          transition={{ duration: 1, ease: EASE, delay: 0.1 }}
         >
           {eyebrow}
         </motion.p>
@@ -106,29 +94,6 @@ export function Hero() {
           </MagneticButton>
         </motion.div>
       </motion.div>
-
-      <motion.a
-        href="#park"
-        className="micro absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-[var(--dim-2)] md:block"
-        style={{ opacity: fade }}
-        data-cursor="В парк"
-      >
-        <motion.span
-          className="flex flex-col items-center gap-3"
-          initial={{ opacity: 0 }}
-          animate={show ? { opacity: 1 } : undefined}
-          transition={{ delay: 1.8, duration: 1 }}
-        >
-          Листайте — идём в парк
-          <span className="relative h-10 w-px overflow-hidden bg-[var(--hair)]">
-            <motion.span
-              className="absolute inset-x-0 top-0 h-1/2 bg-amber"
-              animate={reduced ? undefined : { y: ['-100%', '200%'] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          </span>
-        </motion.span>
-      </motion.a>
     </section>
   )
 }

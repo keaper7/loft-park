@@ -13,12 +13,28 @@ export function Nights() {
     <section id="nights" data-cam="8" className="relative flex min-h-[190vh] items-center">
       <div className="sticky top-0 flex h-[100svh] w-full items-center">
         <div className="scrim-r absolute inset-0" />
-        <div className="relative ml-auto w-full max-w-[720px] px-[var(--pad)] text-right">
-          <p className="micro mb-5 text-amber">{nights.eyebrow}</p>
-          <SplitText text={nights.title} className="display text-[clamp(40px,6vw,100px)]" />
-          <Reveal delay={0.2}>
-            <p className="ml-auto mt-7 max-w-[460px] leading-relaxed text-[var(--dim)]">{nights.text}</p>
-          </Reveal>
+        {/* 820, а не 720: отступы --pad растут до 88px, и на широком экране
+            место под текст внутри колонки съёживалось (512 → 464px), пока
+            шрифт по 5.4vw только рос. Более широкая колонка позволяет
+            оставить заголовок крупным, не упираясь словом в край карточки */}
+        <div className="relative ml-auto w-full max-w-[820px] px-[var(--pad)] text-right">
+          {/* Камера кадра 8 смотрит прямо на неоновую вывеску LOFT · PARK на
+              стене из мха — один только scrim-r к середине экрана почти
+              гаснет, и вывеска с bloom светила прямо сквозь заголовок и
+              абзац на любой ширине экрана. Плашка .glass — тот же приём,
+              что уже работает у карточек фактов и пилюли звука ниже. */}
+          <div className="flex justify-end">
+            <div className="glass max-w-full rounded-[28px] px-[clamp(20px,4vw,40px)] py-[clamp(18px,3.2vw,34px)] text-right">
+              <p className="micro mb-5 text-amber">{nights.eyebrow}</p>
+              {/* «НАБИРАЕТ» — самое длинное слово, его ширина ≈ 7.1 × размер
+                  шрифта. Потолок 74px держит его в 524px при самой узкой
+                  коробке (564px на 1920+), нижние 30px — под экран 320px */}
+              <SplitText text={nights.title} className="display text-[clamp(30px,5.4vw,74px)]" />
+              <Reveal delay={0.2}>
+                <p className="ml-auto mt-7 max-w-[460px] leading-relaxed text-[var(--dim)]">{nights.text}</p>
+              </Reveal>
+            </div>
+          </div>
 
           <ul className="mt-10 grid grid-cols-2 gap-3">
             {nights.facts.map((f, i) => (

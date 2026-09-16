@@ -6,7 +6,6 @@ import { SceneLayer } from '@/components/SceneLayer'
 import { Preloader } from '@/components/Preloader'
 import { Cursor } from '@/components/Cursor'
 import { Nav } from '@/components/Nav'
-import { ScrollProgress } from '@/components/ScrollProgress'
 import { OrderTray } from '@/components/OrderTray'
 import { Grain } from '@/components/Grain'
 import './globals.css'
@@ -47,7 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Preloader />
         <Cursor />
         <Nav />
-        <ScrollProgress />
         <main id="main" className="relative z-10">
           {children}
         </main>

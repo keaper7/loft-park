@@ -44,9 +44,13 @@ export function Chapter({
               <motion.span className="inline-block h-px w-12 origin-left bg-amber" style={{ scaleX: line }} />
               {eyebrow}
             </p>
-            {/* Нижняя граница 30px: слова не переносятся внутри себя, и
-                «ВСТРЕЧАЮТ» шрифтом Unbounded на 40px не влезал в телефон */}
-            <SplitText text={title} className="display text-[clamp(30px,6vw,96px)]" />
+            {/* Слово внутри себя не переносится, поэтому размер ограничен с
+                обеих сторон шириной колонки (640px, дальше не растёт):
+                30px снизу — «ВСТРЕЧАЕТ» на 40px не влезало в телефон;
+                78px сверху — на 96px то же слово занимало 734px при коробке
+                640 и уезжало за край. Страница с overflow-x: clip такой вылет
+                не покажет прокруткой, ловится только замером слова. */}
+            <SplitText text={title} className="display text-[clamp(30px,6vw,78px)]" />
             <Reveal delay={0.25}>
               <p className="mt-7 text-[clamp(16px,1.3vw,20px)] leading-relaxed text-[var(--dim)]">{text}</p>
             </Reveal>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { veranda } from '@/content'
@@ -117,6 +117,39 @@ export function Veranda() {
   const reduced = usePrefersReducedMotion()
   const pinned = desktop && !reduced
 
+  /**
+   * Указатель прокрутки для мобильной ленты.
+   *
+   * Полоса прокрутки у ленты намеренно спрятана (no-scrollbar), следующая
+   * карточка выглядывает всего на пару сантиметров — и что кадры листаются
+   * вбок, на телефоне просто неоткуда узнать. Рисуем свою полоску: её
+   * заполненная часть говорит и «здесь есть продолжение», и «где я сейчас».
+   *
+   * Значение пишем прямо в стиль через ref, а не через setState: свайп иначе
+   * перерисовывал бы React на каждом кадре прокрутки. Состояние меняется
+   * ровно один раз — чтобы убрать подсказку после первого свайпа.
+   *
+   * Только для !pinned: на десктопе ленту двигает GSAP через transform,
+   * scrollLeft там всегда 0, и полоска навсегда осталась бы пустой.
+   */
+  const bar = useRef<HTMLDivElement>(null)
+  const [swiped, setSwiped] = useState(false)
+
+  useEffect(() => {
+    const el = track.current
+    if (pinned || !el) return
+    const onScroll = () => {
+      const max = el.scrollWidth - el.clientWidth
+      const p = max > 0 ? el.scrollLeft / max : 0
+      // минимум 0.12 — полоска видна и в самом начале, иначе кажется пустой
+      if (bar.current) bar.current.style.transform = `scaleX(${Math.max(0.12, p)})`
+      if (el.scrollLeft > 24) setSwiped(true)
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [pinned])
+
   useEffect(() => {
     if (!pinned || !section.current || !track.current) return
     const ctx = gsap.context(() => {
@@ -156,6 +189,11 @@ export function Veranda() {
         <div
           ref={track}
           className={`mt-10 flex gap-[clamp(14px,2vw,28px)] px-[var(--pad)] ${pinned ? 'w-max' : 'no-scrollbar snap-x snap-mandatory overflow-x-auto'}`}
+          /* Только в мобильном режиме: там лента листается пальцем и с
+             syncTouch её жесты забирал бы себе Lenis. На десктопе лента
+             закреплена и едет ОТ скролла страницы — защита там сломала бы
+             саму механику главы */
+          data-lenis-prevent={pinned ? undefined : true}
         >
           {veranda.frames.map((f, i) => (
             <figure
@@ -176,6 +214,25 @@ export function Veranda() {
             </figure>
           ))}
         </div>
+
+        {/* Указатель есть только там, где лента листается пальцем */}
+        {!pinned && (
+          <div className="mt-6 flex items-center gap-4 px-[var(--pad)]">
+            <div className="relative h-[2px] flex-1 overflow-hidden rounded-full bg-[var(--hair)]">
+              <div
+                ref={bar}
+                className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-amber transition-transform duration-150 ease-out"
+                style={{ transform: 'scaleX(0.12)' }}
+              />
+            </div>
+            <span
+              className={`micro flex shrink-0 items-center gap-2 text-[10px] text-[var(--dim-2)] transition-opacity duration-500 ${swiped ? 'opacity-0' : 'opacity-100'}`}
+            >
+              Листайте вбок
+              <span className="veranda-nudge inline-block">→</span>
+            </span>
+          </div>
+        )}
         <style>{`
           @keyframes art-twinkle{0%,100%{opacity:.35}50%{opacity:1}}
           @keyframes art-breathe{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
@@ -185,7 +242,9 @@ export function Veranda() {
           .art-breathe{animation:art-breathe 4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
           .art-bubble{animation:art-bubble 3.2s ease-in infinite}
           .art-ember{animation:art-ember 4s linear infinite}
-          @media (prefers-reduced-motion: reduce){.art-twinkle,.art-breathe,.art-bubble,.art-ember{animation:none}}
+          @keyframes veranda-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+          .veranda-nudge{animation:veranda-nudge 1.4s ease-in-out infinite}
+          @media (prefers-reduced-motion: reduce){.art-twinkle,.art-breathe,.art-bubble,.art-ember,.veranda-nudge{animation:none}}
         `}</style>
       </section>
     </div>

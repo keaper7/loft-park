@@ -117,7 +117,9 @@ export function Menu() {
 
         <div className="sticky top-[84px] z-20 -mx-2 mt-10 flex flex-col gap-3 rounded-2xl bg-ink/95 p-2 md:flex-row md:items-center">
           <LayoutGroup id="menu-tabs">
-            <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню">
+            {/* data-lenis-prevent: с syncTouch Lenis забирает touchmove себе,
+                и лента категорий переставала листаться пальцем вбок */}
+            <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню" data-lenis-prevent>
               {menu.map((c) => {
                 const on = !query && c.id === cat
                 return (

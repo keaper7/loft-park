@@ -127,27 +127,10 @@ html.lenis body {
   border: 1px solid var(--hair);
 }
 
-/* ── Зерно ─────────────────────────────────────────────────── */
-/* Раньше: слой в 2×2 экрана с SVG-фильтром feTurbulence. На ретине это
-   текстура в десятки мегабайт поверх холста — браузер выгружал её плитки,
-   и они мигали. Теперь маленькая PNG-плитка шума (Grain.tsx) и запас 6% */
-.grain {
-  pointer-events: none;
-  position: fixed;
-  inset: -6%;
-  z-index: 60;
-  opacity: 0.06;
-  will-change: transform;
-  animation: grain 0.9s steps(6) infinite;
-}
-@keyframes grain {
-  0% { transform: translate(0, 0); }
-  20% { transform: translate(-3%, 2%); }
-  40% { transform: translate(2%, -3%); }
-  60% { transform: translate(-3%, -1%); }
-  80% { transform: translate(3%, 3%); }
-  100% { transform: translate(0, 0); }
-}
+/* Плёночного зерна здесь больше нет. Полноэкранный слой шума поверх
+   3D-сцены съедал контраст и читался как замыленность — особенно на
+   телефоне, где холст и так рисуется в пониженной плотности пикселей.
+   Сцена даёт достаточно фактуры сама (см. Grain.tsx в истории git). */
 
 /* Мерцание неона: неровный ритм, как у настоящей трубки. Редко и неглубоко —
    провалы до 0.45 каждые 5 секунд выглядели как баг, а не как эффект */
@@ -182,7 +165,6 @@ html.lenis body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .grain,
   .flicker {
     animation: none;
   }

@@ -45,11 +45,15 @@ export function SmoothScroll() {
     document.fonts?.ready.then(remeasure)
     remeasure()
 
+    // Параллакс от курсора — только для мыши. На тач-экране pointermove
+    // приходит во время свайпа, и камера рывками ездила за пальцем поверх
+    // скролла. Проверка та же, что у Cursor и MagneticButton.
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches
     const onMouse = (e: PointerEvent) => {
       scrollState.mouseX = (e.clientX / window.innerWidth) * 2 - 1
       scrollState.mouseY = (e.clientY / window.innerHeight) * 2 - 1
     }
-    window.addEventListener('pointermove', onMouse, { passive: true })
+    if (finePointer) window.addEventListener('pointermove', onMouse, { passive: true })
 
     let cleanup: () => void
 
@@ -65,7 +69,21 @@ export function SmoothScroll() {
         duration: 1.25,
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         smoothWheel: true,
-        syncTouch: false,
+        /**
+         * syncTouch: Lenis ведёт и палец, а не только колесо.
+         *
+         * С false страницу двигал сам браузер, а Lenis лишь пересказывал
+         * редкие нативные события: замер показал, что положение менялось
+         * на ~12% кадров и скакало сразу на ~45px, а камера получала
+         * лестницу. Читать позицию чаще бесполезно — источник сам
+         * ступенчатый. С true Lenis интерполирует прокрутку покадрово,
+         * и DOM с 3D-холстом едут одним и тем же значением в одном кадре.
+         *
+         * Плата: Lenis перехватывает touchmove, поэтому вложенные
+         * горизонтальные ленты (лента веранды, табы меню) помечены
+         * data-lenis-prevent — иначе они перестают листаться пальцем.
+         */
+        syncTouch: true,
         autoRaf: false,
       })
       setLenis(lenis)
@@ -75,11 +93,24 @@ export function SmoothScroll() {
       const unsub = useStore.subscribe((s, prev) => {
         if (s.introDone && !prev.introDone) lenis.start()
       })
-      lenis.on('scroll', ({ scroll }: { scroll: number }) => {
-        updateScroll(scroll)
+      lenis.on('scroll', () => {
         ScrollTrigger.update()
       })
-      const tick = (time: number) => lenis.raf(time * 1000)
+      /**
+       * Позицию читаем каждый кадр, а не только по событию scroll.
+       *
+       * На телефоне Lenis не ведёт тач-скролл (syncTouch: false), страницу
+       * двигает сам браузер, а события приходят рвано и пачками: замер
+       * показал, что значение обновлялось лишь на 60 кадрах из 473 и
+       * скакало сразу на ~45px. Камера получала лестницу вместо плавного
+       * значения — отсюда рывки. window.scrollY в кадре — всегда текущее
+       * положение страницы; на десктопе это то же значение, которое Lenis
+       * сам и выставил, так что инерция колеса не ломается.
+       */
+      const tick = (time: number) => {
+        lenis.raf(time * 1000)
+        updateScroll(window.scrollY)
+      }
       gsap.ticker.add(tick)
       gsap.ticker.lagSmoothing(0)
 

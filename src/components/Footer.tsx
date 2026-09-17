@@ -63,7 +63,7 @@ export function Footer() {
             Контакты выше — только у реального Loft Park (номера и WhatsApp
             намеренно не публикуем, см. content.ts); связь по проекту — сюда. */}
         <div className="mx-auto mt-14 flex max-w-[1320px] flex-col justify-between gap-3 text-xs text-[var(--dim-2)] md:flex-row">
-          <p>Концепт-проект для портфолио. Не официальный сайт ресторана; данные — из открытых источников, 2026.</p>
+          <p>Не официальный сайт ресторана.</p>
           <p>
             Дизайн и разработка —{' '}
             <a
@@ -74,7 +74,7 @@ export function Footer() {
             >
               SEVEN
             </a>{' '}
-            · 3D, WebGL, motion
+            
           </p>
         </div>
       </div>

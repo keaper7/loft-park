@@ -54,7 +54,18 @@ export function Hero() {
           animate={show ? { opacity: 1, y: 0 } : undefined}
           transition={{ duration: 1, ease: EASE, delay: 0.1 }}
         >
-          {eyebrow}
+          {/* По кускам, а не одной строкой. «Нальчик · Центральный парк ·
+              с 10:00 до 01:00» в 375px не помещается, и браузер рвал её в
+              середине времени: «с 10:00 до» оставалось на первой строке,
+              «01:00» уезжало на вторую вплотную к заголовку. Каждый кусок
+              между разделителями неразрывен, перенос возможен только по
+              самим разделителям — время не разваливается. */}
+          {eyebrow.split(' · ').map((part, i) => (
+            <span key={part}>
+              {i > 0 && <span className="opacity-40"> · </span>}
+              <span className="whitespace-nowrap">{part}</span>
+            </span>
+          ))}
         </motion.p>
       </motion.div>
 

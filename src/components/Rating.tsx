@@ -30,7 +30,15 @@ export function Rating() {
 
   return (
     <section className="relative px-[var(--pad)] py-[16vh]">
-      <div ref={ref} className="mx-auto flex max-w-[1100px] flex-col items-center text-center">
+      {/* Подложка нужна: текст здесь стоит по центру поверх сцены, а боковой
+          .scrim рассчитан на колонку у края и центр не закрывает. На телефоне
+          подпись «Гости говорят цифрами» тонула в фонарях над террасой. */}
+      <div className="scrim-c pointer-events-none absolute inset-0" />
+      {/* relative обязателен: шторка выше — absolute, а абсолютный элемент
+          рисуется поверх непозиционированных соседей. Без него подложка
+          легла НА текст, и «5,0» с подписью стали серыми вместо подсветки.
+          В Chapter.tsx то же самое сделано так же — там relative стоит. */}
+      <div ref={ref} className="relative mx-auto flex max-w-[1100px] flex-col items-center text-center">
         <p className="micro mb-6 text-amber">Гости говорят цифрами</p>
         <div className="display neon text-[clamp(120px,24vw,360px)] leading-[0.8] tabular-nums">{value.toFixed(1).replace('.', ',')}</div>
         <div className="mt-8 flex gap-3">
@@ -70,7 +78,9 @@ export function Rating() {
         <p className="mt-8 text-[clamp(18px,1.6vw,24px)] text-[var(--dim)]">
           {/* ширина числа фиксирована: строка не прыгает, пока бежит счётчик */}
           <span className="inline-block min-w-[5ch] text-right tabular-nums text-cream">{ratings.toLocaleString('ru-RU')}</span> оценки и {rating.reviews.toLocaleString('ru-RU')} отзывов
-          на Яндекс Картах · средний чек {rating.averageCheck}
+          на Яндекс Картах ·{' '}
+          {/* неразрывно: иначе «₽» отрывался на третью строку один */}
+          <span className="whitespace-nowrap">средний чек {rating.averageCheck}</span>
         </p>
         <a href={contact.yandexMaps} target="_blank" rel="noreferrer" data-cursor="Открыть" className="micro mt-6 border-b border-amber/50 pb-1 text-amber">
           Проверить на Яндекс Картах ↗

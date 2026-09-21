@@ -60,21 +60,35 @@ function createSanitizePass() {
  * Metal (Apple M-серии, ANGLE) отдаёт полностью чёрный кадр. Сглаживание
  * даёт повышенный dpr, а bloom и виньетка всё равно размывают края.
  */
-function Effects() {
+function Effects({ quality }: { quality: 'high' | 'low' }) {
   const bloom = useRef<BloomEffect>(null)
   const sanitize = useMemo(createSanitizePass, [])
   useEffect(() => () => sanitize.dispose(), [sanitize])
   useFrame(() => {
     if (bloom.current) bloom.current.intensity = fx.bloom
   })
+  /**
+   * SSAO — только на десктопе.
+   *
+   * Он требует enableNormalPass, а это ОТДЕЛЬНЫЙ полный проход отрисовки
+   * сцены в буфер нормалей — фактически вторая отрисовка каждого кадра.
+   * Замер с удушением процессора (эмуляция слабого телефона): с полной
+   * постобработкой 4× давало 44.9 кадра и 147 кадров длиннее 33 мс, 6× —
+   * 30 кадров, 334 тяжёлых, и сторож ронял холст с 750×1624 до 525×1136.
+   * Без постобработки те же прогоны: 55 и 40.5 кадра, 43 и 201 тяжёлый,
+   * и холст оставался 2.0. То есть эффекты отнимали и плавность, и
+   * чёткость разом. Bloom оставляем — на нём держится весь вечерний свет;
+   * мягкие тени в углах на экране шириной 375 точек всё равно не читаются.
+   */
+  const ao = quality === 'high'
   return (
-    // enableNormalPass — для SSAO: он читает нормали сцены
-    <EffectComposer multisampling={0} enableNormalPass>
+    <EffectComposer multisampling={0} enableNormalPass={ao}>
       <primitive object={sanitize} dispose={null} />
       {/* Мягкое затенение в углах, стыках и под мебелью. Настоящие карты теней
           от десятка точечных ламп — это по шесть проходов на лампу; SSAO даёт
           главное: интерьер перестаёт выглядеть «вырезанным из бумаги».
           Работает только вблизи (worldDistance), парк и небо не трогает */}
+      {ao ? (
       <SSAO
         samples={16}
         rings={5}
@@ -88,6 +102,7 @@ function Effects() {
         worldProximityThreshold={0.8}
         worldProximityFalloff={0.3}
       />
+      ) : null}
       <Bloom ref={bloom} mipmapBlur intensity={1} luminanceThreshold={0.95} luminanceSmoothing={0.2} radius={0.75} />
       <Vignette offset={0.25} darkness={0.75} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
@@ -198,11 +213,15 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
       <fogExp2 attach="fog" args={['#0b1016', 0.035]} />
       {/* Только вниз и один раз: смена dpr пересоздаёт буфер холста, и каждое
           «снизить — вернуть» было видно как моргание всей сцены.
-          Ступенька до 1.4, а не до 1: при падении в 1 телефон, у которого
-          разок дрогнула производительность, до конца сессии показывал
-          картинку хуже исходной — а это ровно та мыльность, из-за которой
-          подняли потолок в initialDpr. 1.4 — всё ещё вдвое меньше пикселей,
-          чем при 2, то есть разгрузка настоящая.
+          Ступенька до 1.7 — не до 1 и не до 1.4. При падении в 1 телефон,
+          у которого разок дрогнула производительность, до конца сессии
+          показывал картинку хуже исходной — та самая мыльность, из-за
+          которой подняли потолок в initialDpr. Но и 1.4 оказался немногим
+          лучше: замер с удушением процессора в 6× (эмуляция слабого
+          устройства) дал холст 525×1136 против экранных 1125×2436, то есть
+          растяжение 2.14 — на телефоне это видно глазом. При 1.7 холст
+          637×1380, растяжение 1.76, а пикселей всё равно на 28% меньше,
+          чем при 2: разгрузка сохраняется, а картинка не разваливается.
 
           Только onDecline и без flipflops. Раньше здесь стояло flipflops={1}
           и тот же обработчик на onFallback — из-за этого холст падал на
@@ -216,7 +235,7 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
           onFallback в drei значит «хватит подстраиваться», а не «устройство
           не тянет». Снижение теперь только по onDecline: это 8 кругов из 10
           ниже 40 кадров, то есть сцена действительно не идёт */}
-      {watchPerf && <PerformanceMonitor onDecline={() => setDpr((d) => Math.min(d, 1.4))} />}
+      {watchPerf && <PerformanceMonitor onDecline={() => setDpr((d) => Math.min(d, 1.7))} />}
 
       <hemisphereLight args={['#4a6194', '#140d08', 0.95]} />
       <ambientLight intensity={0.2} color="#ffdcb0" />
@@ -234,7 +253,7 @@ export default function Experience({ quality, reduced }: { quality: 'high' | 'lo
       <Attractions quality={quality} />
       <Dishes />
       <ReadySignal />
-      {!flags.nofx && <Effects />}
+      {!flags.nofx && <Effects quality={quality} />}
     </Canvas>
   )
 }

@@ -115,11 +115,19 @@ export function Menu() {
           </p>
         </div>
 
-        <div className="sticky top-[84px] z-20 -mx-2 mt-10 flex flex-col gap-3 rounded-2xl bg-ink/95 p-2 md:flex-row md:items-center">
+        {/* Одна строка и глухой фон — на телефоне здесь было две строки
+            (табы, под ними поиск) с фоном bg-ink/95. Панель занимала почти
+            четверть экрана, а сквозь оставшиеся 5% прозрачности просвечивали
+            карточки, уезжающие под неё: на скриншоте сквозь поиск читалось
+            «Картофель на углях», а сквозь табы — цена. Выглядело как
+            сломанная вёрстка. Тень отделяет панель от списка под ней. */}
+        <div className="sticky top-[84px] z-20 -mx-2 mt-10 flex items-center gap-2 rounded-2xl bg-ink p-2 shadow-[0_12px_28px_rgba(12,10,8,0.75)] md:gap-3">
           <LayoutGroup id="menu-tabs">
-            {/* data-lenis-prevent: с syncTouch Lenis забирает touchmove себе,
-                и лента категорий переставала листаться пальцем вбок */}
-            <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню" data-lenis-prevent>
+            {/* data-lenis-prevent нужен только в режиме ?sync: там Lenis
+                забирает touchmove себе и лента категорий перестаёт листаться
+                пальцем вбок. По умолчанию тач теперь родной, и атрибут
+                просто ни на что не влияет */}
+            <div className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню" data-lenis-prevent>
               {menu.map((c) => {
                 const on = !query && c.id === cat
                 return (
@@ -141,7 +149,9 @@ export function Menu() {
               })}
             </div>
           </LayoutGroup>
-          <label className="relative flex items-center">
+          {/* Узкий на телефоне: панель теперь одна строка, и поиск
+              обязан ужиматься, иначе выдавливает табы за экран */}
+          <label className="relative flex w-[36%] max-w-[168px] shrink-0 items-center md:w-60 md:max-w-none">
             <span className="sr-only">Поиск по меню</span>
             <svg className="pointer-events-none absolute left-4 h-4 w-4 text-[var(--dim-2)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="7" />

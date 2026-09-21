@@ -101,7 +101,12 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
     for (const x of [-64, -48, -33, -20, -12.5, 12.5, 20, 33, 48, 64]) {
       out.push({ x: x + (r() - 0.5) * 1.2, z: ALLEY.zNear + 2.3, s: 0.9 + r() * 0.35, h: 3.4 + r() * 1.2 })
     }
-    const target = quality === 'high' ? 300 : 140
+    // Телефон: 210. Здесь стояло 140, потом 170 — «по замеру», который не
+    // воспроизводится. Те 30 кадров были не свойством сцены: холст ронял
+    // сторож производительности по таймеру, на здоровых 60 кадрах
+    // (см. разбор в Experience.tsx). После его починки плотность проверена
+    // заново при неизменном холсте 2.00.
+    const target = quality === 'high' ? 300 : 210
     let guard = 0
     while (out.length < target && guard++ < 8000) {
       const x = (r() - 0.5) * 170
@@ -252,12 +257,12 @@ export function Park({ quality }: { quality: 'high' | 'low' }) {
         <sphereGeometry args={[5, 32, 16]} />
         <meshBasicMaterial color={[2.2, 2.1, 1.9]} toneMapped={false} />
       </mesh>
-      <Stars radius={180} depth={60} count={quality === 'high' ? 3000 : 1200} factor={5} saturation={0} fade speed={0.4} />
+      <Stars radius={180} depth={60} count={quality === 'high' ? 3000 : 2200} factor={5} saturation={0} fade speed={0.4} />
 
       {/* редкие и мелкие: сотни крупных «светлячков» над городской площадью
           выглядели как пятна на объективе, а не как вечер в парке */}
-      <Fireflies count={quality === 'high' ? 260 : 120} size={95} />
-      <Fireflies count={quality === 'high' ? 90 : 40} center={[17, 2.5, -82]} area={[26, 4, 30]} color="#ffd9a0" size={70} />
+      <Fireflies count={quality === 'high' ? 260 : 180} size={95} />
+      <Fireflies count={quality === 'high' ? 90 : 65} center={[17, 2.5, -82]} area={[26, 4, 30]} color="#ffd9a0" size={70} />
     </group>
   )
 }

@@ -100,10 +100,25 @@ export function foliageMaterial(params: THREE.MeshStandardMaterialParameters) {
         '#include <common>',
         `#include <common>
         varying vec3 vLeafPos;
-        float leafHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-        float leafNoise(vec3 p) {
-          vec3 i = floor(p);
-          vec3 f = fract(p);
+        /**
+         * mod(64) и явный highp — из-за мерцания листвы на телефонах.
+         *
+         * Сюда приходит мировая координата листа, умноженная на 6.5: для
+         * дерева в (−40, 10, −100) аргумент dot() доходил до −61000. На
+         * телефоне фрагментный шейдер может работать в mediump, где потолок
+         * 65504 — деревья подальше уже переполняли его, а рядом с потолком
+         * шаг представимых чисел равен 32, и sin() от такого аргумента
+         * прыгал при малейшем сдвиге камеры. Листва от этого мерцала.
+         * После mod(64) аргумент не превышает ~33000, а sin()*43758 — ~43758:
+         * обе величины помещаются даже в mediump. Разрыв узора на границе
+         * ячейки невиден: это шум, соседняя ячейка и так случайна.
+         */
+        highp float leafHash(highp vec3 p) {
+          return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+        }
+        highp float leafNoise(highp vec3 p) {
+          highp vec3 i = floor(p);
+          highp vec3 f = fract(p);
           f = f * f * (3.0 - 2.0 * f);
           return mix(
             mix(mix(leafHash(i), leafHash(i + vec3(1, 0, 0)), f.x), mix(leafHash(i + vec3(0, 1, 0)), leafHash(i + vec3(1, 1, 0)), f.x), f.y),
@@ -114,8 +129,13 @@ export function foliageMaterial(params: THREE.MeshStandardMaterialParameters) {
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-        float leafBig = leafNoise(vLeafPos * 1.7);
-        float leafFine = leafNoise(vLeafPos * 6.5);
+        // mod здесь, а не внутри leafHash: хеш зовётся 8 раз на каждый вызов
+        // шума, а шум — дважды на фрагмент, то есть внутри хеша это было бы
+        // 16 операций на пиксель листвы вместо двух. На точность не влияет:
+        // в шум приходит диапазон [0, 64), в хеш попадает максимум ~33000 —
+        // помещается даже в mediump на телефоне
+        float leafBig = leafNoise(mod(vLeafPos * 1.7, 64.0));
+        float leafFine = leafNoise(mod(vLeafPos * 6.5, 64.0));
         diffuseColor.rgb *= 0.45 + 0.9 * leafBig * (0.55 + 0.45 * leafFine);`,
       )
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { menu, type Dish } from '@/content'
 import { rub, useStore } from '@/lib/store'
 import { SplitText } from './SplitText'
@@ -94,6 +94,45 @@ export function Menu() {
   const [cat, setCat] = useState(menu[1].id)
   const [query, setQuery] = useState('')
 
+  /**
+   * Края ленты категорий.
+   *
+   * Разделов десять, в одну строку 1280 они не помещаются, а полоса
+   * прокрутки скрыта (no-scrollbar) — на скриншоте десктопа это выглядело
+   * как разрезанная пополам буква «Д» без намёка, что справа есть
+   * продолжение. На десктопе обрезку убираем совсем: md:flex-wrap
+   * переносит разделы в два ряда, прокрутки там больше нет. Маска нужна
+   * только телефону, где ряд один и прокрутка неизбежна, и включается
+   * лишь когда прокрутка реально возможна: пока лента в начале, левый край
+   * не трогаем; доехали до конца — отпускаем правый. Ширина 18px, а не
+   * 26: при 26 фейд заметно съедал правый край активной таблетки, и она
+   * выглядела выцветшей — как артефакт, а не как приём. Когда краёв нет,
+   * style не выставляется вовсе — лишнего слоя композиции не возникает.
+   */
+  const strip = useRef<HTMLDivElement>(null)
+  const [edge, setEdge] = useState({ l: false, r: false })
+  const syncEdge = useCallback(() => {
+    const el = strip.current
+    if (!el) return
+    const l = el.scrollLeft > 4
+    const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+    setEdge((p) => (p.l === l && p.r === r ? p : { l, r }))
+  }, [])
+  useEffect(() => {
+    const el = strip.current
+    if (!el) return
+    syncEdge()
+    el.addEventListener('scroll', syncEdge, { passive: true })
+    // ширина меняется от поворота экрана и от подгрузки шрифта
+    const ro = new ResizeObserver(syncEdge)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', syncEdge)
+      ro.disconnect()
+    }
+  }, [syncEdge])
+  const fade = `linear-gradient(to right, transparent 0, #000 ${edge.l ? '18px' : '0px'}, #000 calc(100% - ${edge.r ? '18px' : '0px'}), transparent 100%)`
+
   const items = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (q) return menu.flatMap((c) => c.items).filter((d) => d.name.toLowerCase().includes(q))
@@ -127,7 +166,14 @@ export function Menu() {
                 забирает touchmove себе и лента категорий перестаёт листаться
                 пальцем вбок. По умолчанию тач теперь родной, и атрибут
                 просто ни на что не влияет */}
-            <div className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Категории меню" data-lenis-prevent>
+            <div
+              ref={strip}
+              className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto md:flex-wrap md:overflow-x-visible"
+              role="tablist"
+              aria-label="Категории меню"
+              data-lenis-prevent
+              style={edge.l || edge.r ? { maskImage: fade, WebkitMaskImage: fade } : undefined}
+            >
               {menu.map((c) => {
                 const on = !query && c.id === cat
                 return (
@@ -136,9 +182,13 @@ export function Menu() {
                     type="button"
                     role="tab"
                     aria-selected={on}
-                    onClick={() => {
+                    aria-controls="menu-items"
+                    onClick={(e) => {
                       setCat(c.id)
                       setQuery('')
+                      // раздел у края ленты мог быть виден наполовину;
+                      // block: 'nearest' — чтобы страница не поехала вверх
+                      e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
                     }}
                     className={`relative shrink-0 rounded-full px-4 py-2.5 text-sm transition-colors ${on ? 'text-ink' : 'text-[var(--dim)] hover:text-cream'}`}
                   >
@@ -166,7 +216,7 @@ export function Menu() {
           </label>
         </div>
 
-        <motion.ul layout className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <motion.ul layout id="menu-items" role="tabpanel" className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <AnimatePresence mode="popLayout">
             {items.map((d, i) => (
               <DishCard key={`${query ? 'q' : cat}-${d.name}-${d.price}`} dish={d} index={i} />

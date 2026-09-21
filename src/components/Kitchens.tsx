@@ -1,7 +1,7 @@
 'use client'
 
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { AnimatePresence, motion, useInView } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
 import { kitchens } from '@/content'
 import { scrollState } from '@/lib/scroll'
 import { rub } from '@/lib/store'
@@ -17,8 +17,23 @@ const FIRST_CAM = 4
  */
 export function Kitchens() {
   const [active, setActive] = useState(0)
+  const section = useRef<HTMLElement>(null)
+  /**
+   * Покадровый цикл работает только когда секция рядом с экраном.
+   *
+   * Раньше он стартовал один раз и крутился всю жизнь страницы: на первом
+   * экране, в меню, в футере — везде каждые 16 мс читали scrollState и
+   * дёргали setActive вхолостую, в основном потоке рядом с 3D-сценой.
+   * Выигрыш замером не подтверждён: под удушением процессора разница между
+   * версиями тонет в разбросе стенда (±1.5 кадра). Но это работа, которая
+   * за экраном не нужна по определению, а на слабом устройстве каждый
+   * отданный кусок кадра на счету. Запас 300px — чтобы к появлению секции
+   * нужное блюдо уже стояло. Так же сделано в Marquee.
+   */
+  const near = useInView(section, { margin: '300px 0px' })
 
   useEffect(() => {
+    if (!near) return
     let raf = 0
     const tick = () => {
       const idx = Math.max(0, Math.min(2, Math.round(scrollState.cam - FIRST_CAM)))
@@ -27,12 +42,12 @@ export function Kitchens() {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [near])
 
   const k = kitchens[active]
 
   return (
-    <section id="kitchens" className="relative h-[330vh]" aria-label="Три кухни">
+    <section ref={section} id="kitchens" className="relative h-[330vh]" aria-label="Три кухни">
       {kitchens.map((_, i) => (
         <div key={i} data-cam={FIRST_CAM + i} className="absolute left-0 h-0 w-0" style={{ top: `${((i * 2 + 1) / 6) * 100}%` }} />
       ))}

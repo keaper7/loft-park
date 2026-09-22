@@ -22,12 +22,27 @@ function Row({ dir, tilt, serif }: { dir: 1 | -1; tilt: number; serif?: boolean 
   const base = useMotionValue(0)
   const { scrollY } = useScroll()
   const vel = useSpring(useVelocity(scrollY), { damping: 50, stiffness: 400 })
-  const factor = useTransform(vel, [-1500, 1500], [-4, 4], { clamp: false })
+  /**
+   * Множитель скорости ОГРАНИЧЕН (clamp по умолчанию), и диапазон уже.
+   *
+   * Было [-4, 4] с clamp: false — то есть ничем не ограничено. На телефоне
+   * шаг прокрутки доходит до 45 точек за кадр (~2700 точек в секунду), а на
+   * флике и вдвое больше, и множитель улетал за 10×. Замер сдвига ленты
+   * покадрово, пока она на экране: при медленной прокрутке шаг ровный
+   * (неровность 0.09, разброс 1.96…4.03), при быстрой — 1.95…21.09 и
+   * неровность 0.38 и 0.48 на двух лентах. Лента то почти стоит, то летит:
+   * это и читалось как дёрганье. Потолок 2.2 оставляет заметную реакцию на
+   * скролл (до 3.2× базовой скорости), но убирает выброс.
+   */
+  const factor = useTransform(vel, [-1500, 1500], [-2.2, 2.2])
 
   useAnimationFrame((_, delta) => {
     if (reduced || !visible) return
+    // delta сверху ограничена: один пропущенный кадр не должен давать
+    // двойной шаг — иначе просадка сама превращается в рывок ленты
+    const dt = Math.min(delta, 32)
     const f = factor.get()
-    base.set(base.get() + dir * -1.2 * (delta / 1000) * (1 + Math.abs(f)))
+    base.set(base.get() + dir * -1.2 * (dt / 1000) * (1 + Math.abs(f)))
   })
   const x = useTransform(base, (v) => `${wrap(-50, 0, v)}%`)
 
